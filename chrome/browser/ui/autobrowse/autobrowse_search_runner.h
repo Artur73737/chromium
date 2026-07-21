@@ -45,6 +45,7 @@ class AutobrowseSearchRunner : public content::WebContentsObserver {
   std::string BuildDriverScript() const;
 
   void TryAttachAndNavigate();
+  void DoNavigate();
   void EnsurePolling();
   void RunDriver();
   void OnDriverResult(base::Value value);

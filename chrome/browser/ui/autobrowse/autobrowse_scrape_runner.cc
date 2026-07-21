@@ -4,6 +4,8 @@
 
 #include "chrome/browser/ui/autobrowse/autobrowse_scrape_runner.h"
 
+#include "chrome/browser/ui/autobrowse/autobrowse_stealth.h"
+
 #include <cstdio>
 #include <utility>
 
@@ -94,7 +96,9 @@ void AutobrowseScrapeRunner::TryAttach() {
   attached_ = true;
   attach_timer_.Stop();
   Observe(wc);
-  NavigateCurrent();
+  InstallStealthIfEnabled(
+      wc, base::BindOnce(&AutobrowseScrapeRunner::NavigateCurrent,
+                         weak_factory_.GetWeakPtr()));
 }
 
 void AutobrowseScrapeRunner::NavigateCurrent() {

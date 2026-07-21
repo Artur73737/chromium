@@ -4,6 +4,8 @@
 
 #include "chrome/browser/ui/autobrowse/autobrowse_monitor_runner.h"
 
+#include "chrome/browser/ui/autobrowse/autobrowse_stealth.h"
+
 #include <cstdio>
 #include <functional>
 #include <utility>
@@ -93,7 +95,9 @@ void AutobrowseMonitorRunner::TryAttach() {
   attached_ = true;
   attach_timer_.Stop();
   Observe(wc);
-  LoadOnce();
+  InstallStealthIfEnabled(wc,
+                          base::BindOnce(&AutobrowseMonitorRunner::LoadOnce,
+                                         weak_factory_.GetWeakPtr()));
 }
 
 void AutobrowseMonitorRunner::LoadOnce() {

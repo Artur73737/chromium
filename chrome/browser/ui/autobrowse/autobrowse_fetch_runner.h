@@ -48,6 +48,7 @@ class AutobrowseFetchRunner : public content::WebContentsObserver {
   std::string BuildExtractScript() const;
 
   void TryAttachAndNavigate();
+  void DoNavigate();
   void OnLoaded();
   void RunExtract();
   void OnExtractResult(base::Value value);

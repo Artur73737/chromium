@@ -4,6 +4,8 @@
 
 #include "chrome/browser/ui/autobrowse/autobrowse_warmup_runner.h"
 
+#include "chrome/browser/ui/autobrowse/autobrowse_stealth.h"
+
 #include <cstdio>
 #include <utility>
 
@@ -102,7 +104,9 @@ void AutobrowseWarmupRunner::TryAttach() {
   attached_ = true;
   attach_timer_.Stop();
   Observe(wc);
-  NextStep();
+  InstallStealthIfEnabled(wc,
+                          base::BindOnce(&AutobrowseWarmupRunner::NextStep,
+                                         weak_factory_.GetWeakPtr()));
 }
 
 bool AutobrowseWarmupRunner::PastDeadline() const {

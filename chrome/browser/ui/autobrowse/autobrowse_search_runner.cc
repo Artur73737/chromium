@@ -4,6 +4,8 @@
 
 #include "chrome/browser/ui/autobrowse/autobrowse_search_runner.h"
 
+#include "chrome/browser/ui/autobrowse/autobrowse_stealth.h"
+
 #include <cstdio>
 #include <utility>
 
@@ -119,9 +121,18 @@ void AutobrowseSearchRunner::TryAttachAndNavigate() {
   navigated_ = true;
   attach_timer_.Stop();
   Observe(wc);
+  InstallStealthIfEnabled(
+      wc, base::BindOnce(&AutobrowseSearchRunner::DoNavigate,
+                         weak_factory_.GetWeakPtr()));
+}
+
+void AutobrowseSearchRunner::DoNavigate() {
+  if (finished_ || !web_contents()) {
+    return;
+  }
   content::NavigationController::LoadURLParams load_params{GURL(StartUrl())};
   load_params.transition_type = ui::PAGE_TRANSITION_TYPED;
-  wc->GetController().LoadURLWithParams(load_params);
+  web_contents()->GetController().LoadURLWithParams(load_params);
 }
 
 void AutobrowseSearchRunner::DocumentOnLoadCompletedInPrimaryMainFrame() {
