@@ -59,6 +59,7 @@ class AutobrowseFetchRunner : public content::WebContentsObserver {
   void RunExtract();
   void OnExtractResult(base::Value value);
   void Finish(const std::string& output);
+  void MaybeExit();
   void OnTimeout();
 
   base::OnceCallback<void(std::string)> on_complete_;

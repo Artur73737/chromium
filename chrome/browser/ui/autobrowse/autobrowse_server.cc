@@ -175,6 +175,10 @@ bool AutobrowseServer::StartCommand() {
     }
     search_runner_ = std::make_unique<AutobrowseSearchRunner>(
         str("engine", "google"), q, num("max_results", 10), base::FilePath());
+    const std::string scrape = str("scrape", "");
+    if (!scrape.empty()) {
+      search_runner_->SetScrape(scrape);
+    }
     search_runner_->SetCompletionCallback(std::move(cb));
     search_runner_->Start();
     return true;

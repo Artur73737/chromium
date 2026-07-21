@@ -38,6 +38,7 @@ inline constexpr char kAbQuery[] = "ab-query";          // search query
 inline constexpr char kAbEngine[] = "ab-engine";        // search engine
 inline constexpr char kAbMaxResults[] = "ab-max-results";
 inline constexpr char kAbDump[] = "ab-dump";            // html|text|links|markdown
+inline constexpr char kAbScrape[] = "ab-scrape";        // search: scrape each result (text|html|links)
 inline constexpr char kAbEval[] = "ab-eval";            // JS expression to evaluate
 inline constexpr char kAbSelector[] = "ab-selector";    // wait-for CSS selector
 inline constexpr char kAbWaitUntil[] = "ab-wait-until"; // load|domcontentloaded|networkidle0

@@ -46,6 +46,7 @@ Indice:
 8. [Server MCP](#8-server-mcp)
 9. [Tabella completa degli switch](#9-tabella-completa-degli-switch)
 10. [Architettura interna e file](#10-architettura-interna-e-file)
+11. [Tutti i comandi possibili (cheat sheet)](#11-tutti-i-comandi-possibili-cheat-sheet)
 
 ---
 
@@ -170,7 +171,8 @@ snippet). Output JSON Obscura-style. In GUI la finestra resta sui risultati.
 | `--ab-query="Q"` | — | Query (se non passata dalla forma legacy). |
 | `--ab-engine=<e>` / `--autobrowse-engine=<e>` | `google` | `google` \| `bing` \| `duckduckgo`. |
 | `--ab-max-results=N` / `--autobrowse-max-results=N` | `10` | Numero massimo di risultati. |
-| `--ab-output=FILE` / `--autobrowse-output=FILE` | stdout | Scrive il JSON su file. |
+| `--ab-scrape=<kind>` | — | Dopo aver raccolto i link, **apre ogni risultato** e ne estrae il contenuto (`text` \| `html` \| `links`), allegandolo come campo `scraped` a ciascun risultato. |
+| `--ab-output=FILE` / `--autobrowse-output=FILE` | stdout | Scrive il JSON su file (altrimenti stdout). |
 
 ```bash
 # GUI, Google (resta aperta sui risultati)
@@ -180,6 +182,23 @@ chrome.exe --user-data-dir="E:/tmp/ab" \
 # headless, profilo caldo
 chrome.exe --headless --user-data-dir="E:/tmp/ab" \
   --autobrowse=search --ab-query="rust tokio" --ab-engine=google --ab-max-results=5
+
+# raccogli i link E scrape del testo di ogni pagina, salva su file JSON
+chrome.exe --headless --user-data-dir="E:/tmp/ab" \
+  --autobrowse=search --ab-query="rust tokio" --ab-engine=google --ab-max-results=5 \
+  --ab-scrape=text --ab-output="E:/tmp/out.json"
+```
+
+Con `--ab-scrape` ogni risultato guadagna un campo `scraped`:
+```json
+{
+   "count": 2,
+   "results": [
+      { "rank": 1, "url": "https://tokio.rs/", "title": "…",
+        "snippet": "…", "scraped": "Learn\nAPI Docs\nBlog\n…" }
+   ],
+   "took_ms": 12347
+}
 ```
 
 Output:
@@ -469,7 +488,7 @@ Comandi esposti e campi del body JSON:
 
 | Endpoint | Campi JSON |
 |---|---|
-| `/search` | `query` (obbl.), `engine`, `max_results` |
+| `/search` | `query` (obbl.), `engine`, `max_results`, `scrape` (`text`\|`html`\|`links`) |
 | `/fetch` | `url` (obbl.), `eval`, `dump`, `selector`, `wait`, `timeout` |
 | `/scrape` | `urls` (obbl., separati da virgola), `eval`, `dump`, `wait`, `timeout` |
 | `/monitor` | `url` (obbl.), `selector`, `on_change` — **un solo poll**, ritorna il valore |
@@ -542,6 +561,7 @@ curl -s localhost:8080/mcp -d '{"jsonrpc":"2.0","id":3,"method":"tools/call",
 | `--ab-engine=<e>` | search, warmup | motore |
 | `--ab-max-results=N` | search | ceiling risultati |
 | `--ab-dump=<fmt>` | fetch, scrape | formato dump |
+| `--ab-scrape=<kind>` | search | scrape di ogni risultato (`text`\|`html`\|`links`) |
 | `--ab-eval="EXPR"` | fetch, scrape | espressione JS |
 | `--ab-selector=CSS` | monitor (e fetch) | selettore elemento |
 | `--ab-on-change="JS"` | monitor | JS che produce il valore |
@@ -614,3 +634,95 @@ invisibile alla pagina, quindi l'automazione non è rilevabile via override di
 `document`/DOM. Lo **stealth** invece deve stare nel **main world** (vede la
 pagina): per questo usa il canale DevTools `addScriptToEvaluateOnNewDocument`
 (§5), non l'isolated world.
+
+---
+
+## 11. Tutti i comandi possibili (cheat sheet)
+
+Assumi `chrome.exe = E:\project-seri\chromium\src\out\Default\chrome.exe`. In GUI
+ometti `--headless`. Output di default su **stdout**; aggiungi `--ab-output=FILE`
+per scrivere su **file** (JSON per search/scrape, testo/HTML per fetch).
+
+```bash
+# ── SEARCH ────────────────────────────────────────────────────────────────
+# solo link (SERP)
+chrome.exe --headless --user-data-dir="E:/tmp/ab" \
+  --autobrowse=search --ab-query="rust tokio" --ab-engine=google --ab-max-results=5
+
+# link + scrape del testo di ogni risultato, su file JSON
+chrome.exe --headless --user-data-dir="E:/tmp/ab" \
+  --autobrowse=search --ab-query="rust tokio" --ab-engine=google --ab-max-results=5 \
+  --ab-scrape=text --ab-output="E:/tmp/out.json"
+
+# link + scrape dei link di ogni risultato (crawl 1 livello)
+chrome.exe --headless --user-data-dir="E:/tmp/ab" \
+  --autobrowse=search --ab-query="climate report" --ab-engine=bing --ab-scrape=links
+
+# scorciatoia legacy + GUI (finestra resta sui risultati)
+chrome.exe --user-data-dir="E:/tmp/ab" \
+  --autobrowse-search="python asyncio" --autobrowse-engine=duckduckgo
+
+# ── FETCH ─────────────────────────────────────────────────────────────────
+chrome.exe --headless --autobrowse=fetch --ab-url="https://example.com" --ab-eval="document.title"
+chrome.exe --headless --autobrowse=fetch --ab-url="https://example.com" --ab-dump=text
+chrome.exe --headless --autobrowse=fetch --ab-url="https://example.com" --ab-dump=html
+chrome.exe --headless --autobrowse=fetch --ab-url="https://example.com" --ab-dump=links
+chrome.exe --headless --autobrowse=fetch --ab-url="https://example.com" --ab-dump=markdown
+chrome.exe --headless --autobrowse=fetch --ab-url="https://spa.example" \
+  --ab-wait-until=networkidle0 --ab-wait=3 --ab-timeout=60 --ab-output="E:/tmp/page.html"
+
+# ── SCRAPE (molti URL) ────────────────────────────────────────────────────
+chrome.exe --headless --autobrowse=scrape \
+  --ab-urls="https://example.com,https://example.org" --ab-eval="document.title"
+chrome.exe --headless --autobrowse=scrape \
+  --ab-urls="https://a.com,https://b.com" --ab-dump=text --ab-output="E:/tmp/scr.json"
+
+# ── MONITOR ───────────────────────────────────────────────────────────────
+chrome.exe --headless --autobrowse=monitor --ab-url="https://example.com" \
+  --ab-selector="h1" --ab-interval=30 --ab-max-runs=5
+chrome.exe --headless --autobrowse=monitor --ab-url="https://x.example/status" \
+  --ab-selector="#price" --ab-on-change="textContent.trim()" \
+  --ab-interval=60 --ab-output="E:/tmp/watch.ndjson"
+
+# ── SESSION-INFO ──────────────────────────────────────────────────────────
+chrome.exe --headless --user-data-dir="E:/tmp/ab" --autobrowse=session-info --ab-top=20
+
+# ── WARMUP ────────────────────────────────────────────────────────────────
+chrome.exe --headless --user-data-dir="E:/tmp/ab" \
+  --autobrowse=warmup --ab-engine=google --ab-minutes=15
+chrome.exe --headless --user-data-dir="E:/tmp/ab" \
+  --autobrowse=warmup --ab-engine=bing --ab-minutes=10 \
+  --ab-query="rust jobs,python jobs" --ab-urls="https://news.ycombinator.com"
+
+# ── STEALTH (trasversale, su qualunque comando) ───────────────────────────
+chrome.exe --headless --stealth --autobrowse=fetch --ab-url="https://bot.sannysoft.com" --ab-dump=text
+chrome.exe --headless --stealth --user-data-dir="E:/tmp/ab" \
+  --autobrowse=search --ab-query="rust tokio" --ab-engine=google
+
+# ── PROXY / USER-AGENT (flag nativi) ──────────────────────────────────────
+chrome.exe --headless --proxy-server="socks5://127.0.0.1:1080" \
+  --autobrowse=fetch --ab-url="https://example.com" --ab-dump=text
+chrome.exe --headless --user-agent="MyUA/1.0" \
+  --autobrowse=fetch --ab-url="https://example.com" --ab-eval="navigator.userAgent"
+
+# ── SERVER HTTP + WS + MCP ────────────────────────────────────────────────
+chrome.exe --user-data-dir="E:/tmp/ab" --autobrowse=serve --ab-port=8080 about:blank &
+curl -s localhost:8080/health
+curl -s localhost:8080/search      -d '{"query":"rust tokio","engine":"google","max_results":3}'
+curl -s localhost:8080/search      -d '{"query":"rust tokio","scrape":"text","max_results":2}'
+curl -s localhost:8080/fetch       -d '{"url":"https://example.com","eval":"document.title"}'
+curl -s localhost:8080/fetch       -d '{"url":"https://example.com","dump":"markdown"}'
+curl -s localhost:8080/scrape      -d '{"urls":"https://a.com,https://b.com","dump":"text"}'
+curl -s localhost:8080/monitor     -d '{"url":"https://example.com","selector":"h1"}'
+curl -s localhost:8080/session-info -d '{"top":10}'
+curl -s localhost:8080/warmup      -d '{"engine":"google","minutes":5}'
+# MCP (JSON-RPC)
+curl -s localhost:8080/mcp -d '{"jsonrpc":"2.0","id":1,"method":"initialize"}'
+curl -s localhost:8080/mcp -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+curl -s localhost:8080/mcp -d '{"jsonrpc":"2.0","id":3,"method":"tools/call",
+  "params":{"name":"fetch","arguments":{"url":"https://example.com","eval":"document.title"}}}'
+
+# ── CDP (superficie separata, Puppeteer/Playwright) ───────────────────────
+chrome.exe --headless --remote-debugging-port=9222
+# poi: puppeteer.connect({ browserWSEndpoint: 'ws://127.0.0.1:9222/devtools/browser' })
+```

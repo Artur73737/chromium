@@ -19,6 +19,7 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/task/thread_pool.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/ui/browser_window/public/browser_collection.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -68,6 +69,11 @@ std::string JsStringLiteral(const std::string& s) {
   std::string out;
   base::EscapeJSONString(s, /*put_in_quotes=*/true, &out);
   return out;
+}
+
+// Runs on the thread pool (MayBlock): writes the output file, result ignored.
+void WriteOutputFile(const base::FilePath& path, const std::string& data) {
+  base::WriteFile(path, data);
 }
 
 }  // namespace
@@ -136,6 +142,17 @@ void AutobrowseSearchRunner::DoNavigate() {
 }
 
 void AutobrowseSearchRunner::DocumentOnLoadCompletedInPrimaryMainFrame() {
+  if (scraping_) {
+    // A result page finished loading: extract its content after a short settle.
+    if (scrape_extracted_) {
+      return;
+    }
+    scrape_settle_timer_.Start(
+        FROM_HERE, base::Seconds(1),
+        base::BindOnce(&AutobrowseSearchRunner::ExtractScrapeContent,
+                       weak_factory_.GetWeakPtr()));
+    return;
+  }
   EnsurePolling();
   RunDriver();
 }
@@ -177,9 +194,126 @@ void AutobrowseSearchRunner::OnDriverResult(base::Value value) {
     LOG(ERROR) << "[autobrowse] driver -> " << s;
   }
   if (!s.empty() && s.front() == '{') {
-    Finish(s);
+    MaybeScrapeThenFinish(s);
   }
   // "CONSENT" / "TYPING" / "WAIT": keep polling until a final JSON arrives.
+}
+
+void AutobrowseSearchRunner::MaybeScrapeThenFinish(
+    const std::string& final_json) {
+  if (finished_ || scraping_) {
+    return;
+  }
+  // No scrape requested: emit the SERP result as-is.
+  if (scrape_kind_.empty()) {
+    Finish(final_json);
+    return;
+  }
+  std::optional<base::Value> parsed =
+      base::JSONReader::Read(final_json, base::JSON_PARSE_RFC);
+  if (!parsed || !parsed->is_dict()) {
+    Finish(final_json);
+    return;
+  }
+  base::ListValue* results = parsed->GetDict().FindList("results");
+  if (!results || results->empty()) {
+    Finish(final_json);
+    return;
+  }
+  // Enter the scrape phase: stop the SERP driver, then open each result.
+  pending_result_ = std::move(*parsed);
+  scraping_ = true;
+  scrape_index_ = 0;
+  poll_timer_.Stop();
+  deadline_timer_.Stop();  // per-item timers bound the scrape phase instead.
+  NavigateToScrapeTarget();
+}
+
+void AutobrowseSearchRunner::NavigateToScrapeTarget() {
+  if (finished_ || !web_contents()) {
+    return;
+  }
+  base::ListValue* results = pending_result_.GetDict().FindList("results");
+  if (!results || scrape_index_ >= results->size()) {
+    FinishScrape();
+    return;
+  }
+  const std::string* url =
+      (*results)[scrape_index_].GetDict().FindString("url");
+  if (!url) {
+    ++scrape_index_;
+    NavigateToScrapeTarget();
+    return;
+  }
+  scrape_extracted_ = false;
+  scrape_item_timer_.Start(
+      FROM_HERE, base::Seconds(20),
+      base::BindOnce(&AutobrowseSearchRunner::OnScrapeItemTimeout,
+                     weak_factory_.GetWeakPtr()));
+  content::NavigationController::LoadURLParams params{GURL(*url)};
+  params.transition_type = ui::PAGE_TRANSITION_LINK;
+  web_contents()->GetController().LoadURLWithParams(params);
+}
+
+void AutobrowseSearchRunner::ExtractScrapeContent() {
+  if (finished_ || scrape_extracted_ || !web_contents()) {
+    return;
+  }
+  content::RenderFrameHost* rfh = web_contents()->GetPrimaryMainFrame();
+  if (!rfh) {
+    return;
+  }
+  scrape_extracted_ = true;
+  rfh->ExecuteJavaScriptInIsolatedWorld(
+      base::UTF8ToUTF16(BuildScrapeScript()),
+      base::BindOnce(&AutobrowseSearchRunner::OnScrapeContent,
+                     weak_factory_.GetWeakPtr()),
+      ISOLATED_WORLD_ID_CHROME_INTERNAL);
+}
+
+void AutobrowseSearchRunner::OnScrapeContent(base::Value value) {
+  if (finished_) {
+    return;
+  }
+  scrape_item_timer_.Stop();
+  base::ListValue* results = pending_result_.GetDict().FindList("results");
+  if (results && scrape_index_ < results->size()) {
+    (*results)[scrape_index_].GetDict().Set("scraped", std::move(value));
+  }
+  ++scrape_index_;
+  NavigateToScrapeTarget();
+}
+
+void AutobrowseSearchRunner::OnScrapeItemTimeout() {
+  if (finished_ || scrape_extracted_) {
+    return;
+  }
+  // This result page never settled: mark it and move on.
+  scrape_extracted_ = true;
+  base::ListValue* results = pending_result_.GetDict().FindList("results");
+  if (results && scrape_index_ < results->size()) {
+    (*results)[scrape_index_].GetDict().Set("scraped", "error: timeout");
+  }
+  ++scrape_index_;
+  NavigateToScrapeTarget();
+}
+
+void AutobrowseSearchRunner::FinishScrape() {
+  std::string json;
+  base::JSONWriter::Write(pending_result_, &json);
+  Finish(json);
+}
+
+std::string AutobrowseSearchRunner::BuildScrapeScript() const {
+  if (scrape_kind_ == "html") {
+    return "(document.documentElement?document.documentElement.outerHTML:'')";
+  }
+  if (scrape_kind_ == "links") {
+    return "(function(){return [...document.querySelectorAll('a[href]')]"
+           ".map(a=>a.href);})()";
+  }
+  // default: visible text
+  return "(document.body?document.body.innerText:'')";
 }
 
 void AutobrowseSearchRunner::Finish(const std::string& json) {
@@ -215,20 +349,22 @@ void AutobrowseSearchRunner::Finish(const std::string& json) {
   if (output_path_.empty()) {
     fprintf(stdout, "%s\n", out.c_str());
     fflush(stdout);
+    MaybeExit();
   } else {
-    if (!base::WriteFile(output_path_, out)) {
-      fprintf(stderr, "[autobrowse] failed to write output file: %s\n",
-              output_path_.AsUTF8Unsafe().c_str());
-    }
+    // Disk I/O must not block the UI thread: write on the thread pool, then
+    // exit (headless) once the file is on disk.
+    base::ThreadPool::PostTaskAndReply(
+        FROM_HERE, {base::MayBlock()},
+        base::BindOnce(&WriteOutputFile, output_path_, out),
+        base::BindOnce(&AutobrowseSearchRunner::MaybeExit,
+                       weak_factory_.GetWeakPtr()));
   }
+}
 
-  // In headless mode there is no visible UI, so the run is only useful for its
-  // stdout/file output: exit once done. With a visible GUI, keep the window
-  // open on the results page so the user can inspect it; the search is over but
-  // the browser stays alive like a normal session.
-  const bool headless =
-      base::CommandLine::ForCurrentProcess()->HasSwitch("headless");
-  if (headless) {
+void AutobrowseSearchRunner::MaybeExit() {
+  // Headless has no visible UI, so exit once the output is produced. A visible
+  // GUI keeps the window open on the results page.
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch("headless")) {
     chrome::AttemptExit();
   }
 }

@@ -57,6 +57,7 @@ class AutobrowseScrapeRunner : public content::WebContentsObserver {
   void OnExtractResult(base::Value value);
   void AdvanceOrFinish();
   void Finish();
+  void MaybeExit();
   void OnItemTimeout();
 
   base::OnceCallback<void(std::string)> on_complete_;

@@ -120,6 +120,9 @@ void AutobrowseMainExtraParts::StartSearch() {
 
   search_runner_ = std::make_unique<AutobrowseSearchRunner>(
       std::move(engine), query, max_results, output_path);
+  if (cmd.HasSwitch(switches::kAbScrape)) {
+    search_runner_->SetScrape(cmd.GetSwitchValueASCII(switches::kAbScrape));
+  }
   search_runner_->Start();
 }
 

@@ -15,6 +15,7 @@
 #include "base/json/json_writer.h"
 #include "base/strings/strcat.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/task/thread_pool.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/ui/browser_window/public/browser_collection.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -52,6 +53,11 @@ content::WebContents* FindActiveTab() {
       },
       BrowserCollection::Order::kActivation);
   return found;
+}
+
+// Runs on the thread pool (MayBlock): writes the output file, result ignored.
+void WriteOutputFile(const base::FilePath& path, const std::string& data) {
+  base::WriteFile(path, data);
 }
 
 }  // namespace
@@ -208,17 +214,18 @@ void AutobrowseScrapeRunner::Finish() {
   if (output_path_.empty()) {
     fprintf(stdout, "%s\n", pretty.c_str());
     fflush(stdout);
+    MaybeExit();
   } else {
-    if (!base::WriteFile(output_path_, pretty)) {
-      fprintf(stderr, "[autobrowse] failed to write output file: %s\n",
-              output_path_.AsUTF8Unsafe().c_str());
-    }
+    base::ThreadPool::PostTaskAndReply(
+        FROM_HERE, {base::MayBlock()},
+        base::BindOnce(&WriteOutputFile, output_path_, pretty),
+        base::BindOnce(&AutobrowseScrapeRunner::MaybeExit,
+                       weak_factory_.GetWeakPtr()));
   }
+}
 
-  Observe(nullptr);
-  const bool headless =
-      base::CommandLine::ForCurrentProcess()->HasSwitch("headless");
-  if (headless) {
+void AutobrowseScrapeRunner::MaybeExit() {
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch("headless")) {
     chrome::AttemptExit();
   }
 }

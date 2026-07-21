@@ -18,6 +18,7 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/task/thread_pool.h"
 #include "base/time/time.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/ui/browser_window/public/browser_collection.h"
@@ -56,6 +57,11 @@ content::WebContents* FindActiveTab() {
       },
       BrowserCollection::Order::kActivation);
   return found;
+}
+
+// Runs on the thread pool (MayBlock): appends one NDJSON line to the file.
+void AppendLineToFile(const base::FilePath& path, const std::string& line) {
+  base::AppendToFile(path, line);
 }
 
 }  // namespace
@@ -178,7 +184,9 @@ void AutobrowseMonitorRunner::OnExtractResult(base::Value value) {
       fflush(stdout);
     } else {
       line += "\n";
-      base::AppendToFile(output_path_, line);
+      base::ThreadPool::PostTask(
+          FROM_HERE, {base::MayBlock()},
+          base::BindOnce(&AppendLineToFile, output_path_, line));
     }
   }
 
