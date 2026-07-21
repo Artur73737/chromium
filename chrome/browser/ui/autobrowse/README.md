@@ -272,6 +272,31 @@ top domains:
      10  bing.com
 ```
 
+### `serve` — server HTTP + WebSocket unificato (IN CORSO)
+
+Un **unico** server (`net::HttpServer`, che gestisce HTTP e WS insieme) espone i
+comandi autobrowse sulla rete. Poiché i comandi pilotano l'unico tab attivo, le
+richieste sono **serializzate** (una alla volta, le altre in coda).
+
+| Switch | Default | Descrizione |
+|---|---|---|
+| `--autobrowse=serve` | — | Avvia il server (resta vivo). |
+| `--ab-port=N` | `8080` | Porta HTTP/WS (bind su 127.0.0.1). |
+
+- `GET /health` → `ok`.
+- `POST /<comando>` con body JSON → risultato JSON. WebSocket: una frame JSON di
+  richiesta (`{"command":"search",...}`) → una frame JSON di risposta.
+
+```bash
+chrome.exe --user-data-dir="E:/tmp/ab" --autobrowse=serve --ab-port=8080 about:blank &
+curl -s localhost:8080/search -d '{"query":"python asyncio","engine":"google","max_results":3}'
+```
+
+**Stato:** infrastruttura HTTP+WS pronta e `search` collegato e testato. I
+restanti comandi (fetch/scrape/monitor/session-info/warmup) si agganciano allo
+stesso dispatch aggiungendo la callback di completamento ai rispettivi runner
+(come già fatto per search).
+
 ### Già nativi in Chromium (nessun codice nuovo)
 
 Alcuni comandi/flag globali di Obscura esistono già in Chrome:

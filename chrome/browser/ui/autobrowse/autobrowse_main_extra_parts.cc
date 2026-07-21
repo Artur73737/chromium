@@ -15,6 +15,7 @@
 #include "chrome/browser/ui/autobrowse/autobrowse_monitor_runner.h"
 #include "chrome/browser/ui/autobrowse/autobrowse_scrape_runner.h"
 #include "chrome/browser/ui/autobrowse/autobrowse_search_runner.h"
+#include "chrome/browser/ui/autobrowse/autobrowse_server.h"
 #include "chrome/browser/ui/autobrowse/autobrowse_session_info_runner.h"
 #include "chrome/browser/ui/autobrowse/autobrowse_warmup_runner.h"
 #include "chrome/browser/ui/autobrowse/autobrowse_switches.h"
@@ -80,6 +81,8 @@ void AutobrowseMainExtraParts::PostBrowserStart() {
     StartSessionInfo();
   } else if (command == "warmup") {
     StartWarmup();
+  } else if (command == "serve" || command == "octo-serve") {
+    StartServe();
   } else {
     fprintf(stderr, "[autobrowse] unknown command: %s\n", command.c_str());
   }
@@ -221,6 +224,15 @@ void AutobrowseMainExtraParts::StartWarmup() {
   warmup_runner_ = std::make_unique<AutobrowseWarmupRunner>(
       std::move(engine), std::move(queries), std::move(urls), minutes);
   warmup_runner_->Start();
+}
+
+void AutobrowseMainExtraParts::StartServe() {
+  const int port = GetIntSwitch(switches::kAbPort, 8080);
+  server_ = std::make_unique<AutobrowseServer>();
+  if (!server_->Start(port)) {
+    server_.reset();
+  }
+  // The server keeps running; the browser stays alive to serve requests.
 }
 
 void AutobrowseMainExtraParts::StartSessionInfo() {

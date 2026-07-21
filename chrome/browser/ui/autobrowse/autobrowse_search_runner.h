@@ -8,6 +8,7 @@
 #include <string>
 
 #include "base/files/file_path.h"
+#include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
@@ -34,6 +35,13 @@ class AutobrowseSearchRunner : public content::WebContentsObserver {
 
   ~AutobrowseSearchRunner() override;
 
+  // When set, the final JSON is delivered here and the process is NOT exited
+  // (server mode). When unset, the runner prints/writes the result and exits in
+  // headless (CLI mode).
+  void SetCompletionCallback(base::OnceCallback<void(std::string)> cb) {
+    on_complete_ = std::move(cb);
+  }
+
   // Finds the active tab (retrying until one exists) and starts navigation.
   void Start();
 
@@ -51,6 +59,8 @@ class AutobrowseSearchRunner : public content::WebContentsObserver {
   void OnDriverResult(base::Value value);
   void Finish(const std::string& json);
   void OnTimeout();
+
+  base::OnceCallback<void(std::string)> on_complete_;
 
   const std::string engine_;
   const std::string query_;

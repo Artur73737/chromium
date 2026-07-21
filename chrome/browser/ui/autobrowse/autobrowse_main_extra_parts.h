@@ -17,6 +17,7 @@ class AutobrowseScrapeRunner;
 class AutobrowseMonitorRunner;
 class AutobrowseSessionInfoRunner;
 class AutobrowseWarmupRunner;
+class AutobrowseServer;
 
 // Browser-process entry point for the native automation feature (the Chromium
 // port of the Obscura command surface). When --autobrowse-search is present it
@@ -42,6 +43,7 @@ class AutobrowseMainExtraParts : public ChromeBrowserMainExtraParts {
   void StartMonitor();
   void StartSessionInfo();
   void StartWarmup();
+  void StartServe();
 
   std::unique_ptr<AutobrowseSearchRunner> search_runner_;
   std::unique_ptr<AutobrowseFetchRunner> fetch_runner_;
@@ -49,6 +51,7 @@ class AutobrowseMainExtraParts : public ChromeBrowserMainExtraParts {
   std::unique_ptr<AutobrowseMonitorRunner> monitor_runner_;
   std::unique_ptr<AutobrowseSessionInfoRunner> session_info_runner_;
   std::unique_ptr<AutobrowseWarmupRunner> warmup_runner_;
+  std::unique_ptr<AutobrowseServer> server_;
 };
 
 }  // namespace autobrowse

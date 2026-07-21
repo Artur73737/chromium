@@ -397,6 +397,8 @@ static_library("ui") {
     "autobrowse/autobrowse_scrape_runner.h",
     "autobrowse/autobrowse_search_runner.cc",
     "autobrowse/autobrowse_search_runner.h",
+    "autobrowse/autobrowse_server.cc",
+    "autobrowse/autobrowse_server.h",
     "autobrowse/autobrowse_session_info_runner.cc",
     "autobrowse/autobrowse_session_info_runner.h",
     "autobrowse/autobrowse_stealth.cc",

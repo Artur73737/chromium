@@ -49,6 +49,7 @@ inline constexpr char kAbInterval[] = "ab-interval";    // monitor: poll interva
 inline constexpr char kAbMaxRuns[] = "ab-max-runs";     // monitor: stop after N polls (0=forever)
 inline constexpr char kAbTop[] = "ab-top";              // session-info: top N domains
 inline constexpr char kAbMinutes[] = "ab-minutes";      // warmup: browse duration (minutes)
+inline constexpr char kAbPort[] = "ab-port";            // serve: HTTP/WS port
 
 }  // namespace switches
 }  // namespace autobrowse

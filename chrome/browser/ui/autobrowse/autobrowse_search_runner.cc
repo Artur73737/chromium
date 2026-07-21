@@ -204,6 +204,14 @@ void AutobrowseSearchRunner::Finish(const std::string& json) {
     }
   }
 
+  Observe(nullptr);
+
+  // Server mode: hand the result to the callback and stay alive for more work.
+  if (on_complete_) {
+    std::move(on_complete_).Run(out);
+    return;
+  }
+
   if (output_path_.empty()) {
     fprintf(stdout, "%s\n", out.c_str());
     fflush(stdout);
@@ -213,8 +221,6 @@ void AutobrowseSearchRunner::Finish(const std::string& json) {
               output_path_.AsUTF8Unsafe().c_str());
     }
   }
-
-  Observe(nullptr);
 
   // In headless mode there is no visible UI, so the run is only useful for its
   // stdout/file output: exit once done. With a visible GUI, keep the window
