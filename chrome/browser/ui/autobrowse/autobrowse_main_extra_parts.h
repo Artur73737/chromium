@@ -14,6 +14,8 @@ namespace autobrowse {
 class AutobrowseSearchRunner;
 class AutobrowseFetchRunner;
 class AutobrowseScrapeRunner;
+class AutobrowseMonitorRunner;
+class AutobrowseSessionInfoRunner;
 
 // Browser-process entry point for the native automation feature (the Chromium
 // port of the Obscura command surface). When --autobrowse-search is present it
@@ -36,10 +38,14 @@ class AutobrowseMainExtraParts : public ChromeBrowserMainExtraParts {
   void StartSearch();
   void StartFetch();
   void StartScrape();
+  void StartMonitor();
+  void StartSessionInfo();
 
   std::unique_ptr<AutobrowseSearchRunner> search_runner_;
   std::unique_ptr<AutobrowseFetchRunner> fetch_runner_;
   std::unique_ptr<AutobrowseScrapeRunner> scrape_runner_;
+  std::unique_ptr<AutobrowseMonitorRunner> monitor_runner_;
+  std::unique_ptr<AutobrowseSessionInfoRunner> session_info_runner_;
 };
 
 }  // namespace autobrowse

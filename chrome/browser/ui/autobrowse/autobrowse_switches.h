@@ -44,6 +44,10 @@ inline constexpr char kAbWaitUntil[] = "ab-wait-until"; // load|domcontentloaded
 inline constexpr char kAbWait[] = "ab-wait";            // extra settle seconds
 inline constexpr char kAbTimeout[] = "ab-timeout";      // navigation timeout seconds
 inline constexpr char kAbOutput[] = "ab-output";        // write output to file
+inline constexpr char kAbOnChange[] = "ab-on-change";   // monitor: JS producing the value
+inline constexpr char kAbInterval[] = "ab-interval";    // monitor: poll interval seconds
+inline constexpr char kAbMaxRuns[] = "ab-max-runs";     // monitor: stop after N polls (0=forever)
+inline constexpr char kAbTop[] = "ab-top";              // session-info: top N domains
 
 }  // namespace switches
 }  // namespace autobrowse
