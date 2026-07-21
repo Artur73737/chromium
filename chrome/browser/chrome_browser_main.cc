@@ -35,6 +35,7 @@
 #include "chrome/browser/browser_features.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/browser_process_impl.h"
+#include "chrome/browser/ui/autobrowse/autobrowse_main_extra_parts.h"
 #include "chrome/browser/chrome_browser_main_extra_parts.h"
 #include "chrome/browser/component_updater/registration.h"
 #include "chrome/browser/enterprise/browser_management/management_service_factory.h"
@@ -801,6 +802,11 @@ std::unique_ptr<content::BrowserMainParts> ChromeBrowserMainParts::Create(
 #if !BUILDFLAG(IS_ANDROID)
   main_parts->AddParts(
       std::make_unique<headless::ChromeBrowserMainExtraPartsHeadless>());
+#endif
+
+#if !BUILDFLAG(IS_ANDROID)
+  main_parts->AddParts(
+      std::make_unique<autobrowse::AutobrowseMainExtraParts>());
 #endif
 
 #if BUILDFLAG(CHROME_FOR_TESTING)

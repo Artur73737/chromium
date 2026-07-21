@@ -1,0 +1,72 @@
+// Copyright 2026 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#ifndef CHROME_BROWSER_UI_AUTOBROWSE_AUTOBROWSE_SEARCH_RUNNER_H_
+#define CHROME_BROWSER_UI_AUTOBROWSE_AUTOBROWSE_SEARCH_RUNNER_H_
+
+#include <string>
+
+#include "base/files/file_path.h"
+#include "base/memory/weak_ptr.h"
+#include "base/time/time.h"
+#include "base/timer/timer.h"
+#include "base/values.h"
+#include "content/public/browser/web_contents_observer.h"
+
+namespace autobrowse {
+
+// Drives a human-like web search inside the browser's visible active tab:
+// navigates it to the engine home page, types the query letter-by-letter into
+// the search box, submits with Enter, waits for the SERP, and collects the top
+// result links (never via a search API). The final result is emitted as JSON
+// (Obscura-compatible shape) to stdout or to a file, and the browser exits.
+// The exact same flow runs headless, just without a visible window.
+class AutobrowseSearchRunner : public content::WebContentsObserver {
+ public:
+  AutobrowseSearchRunner(std::string engine,
+                         std::string query,
+                         int max_results,
+                         base::FilePath output_path);
+
+  AutobrowseSearchRunner(const AutobrowseSearchRunner&) = delete;
+  AutobrowseSearchRunner& operator=(const AutobrowseSearchRunner&) = delete;
+
+  ~AutobrowseSearchRunner() override;
+
+  // Finds the active tab (retrying until one exists) and starts navigation.
+  void Start();
+
+ private:
+  // content::WebContentsObserver:
+  void DocumentOnLoadCompletedInPrimaryMainFrame() override;
+
+  std::string StartUrl() const;
+  std::string BuildDriverScript() const;
+
+  void TryAttachAndNavigate();
+  void EnsurePolling();
+  void RunDriver();
+  void OnDriverResult(base::Value value);
+  void Finish(const std::string& json);
+  void OnTimeout();
+
+  const std::string engine_;
+  const std::string query_;
+  const int max_results_;
+  const base::FilePath output_path_;
+
+  base::TimeTicks start_time_;
+  base::RepeatingTimer attach_timer_;
+  base::RepeatingTimer poll_timer_;
+  base::OneShotTimer deadline_timer_;
+  bool navigated_ = false;
+  bool polling_started_ = false;
+  bool finished_ = false;
+
+  base::WeakPtrFactory<AutobrowseSearchRunner> weak_factory_{this};
+};
+
+}  // namespace autobrowse
+
+#endif  // CHROME_BROWSER_UI_AUTOBROWSE_AUTOBROWSE_SEARCH_RUNNER_H_

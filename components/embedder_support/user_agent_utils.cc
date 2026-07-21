@@ -215,7 +215,14 @@ const blink::UserAgentBrandList GetUserAgentBrandFullVersionListInternal(
 // depending on the Reduce User-Agent reduction phase features.
 std::string GetUserAgentInternal() {
   std::string product = GetProductAndVersion();
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(kHeadless)) {
+  // In autobrowse mode the headless browser must be indistinguishable from a
+  // headed one, so keep the plain "Chrome" product token instead of leaking
+  // "HeadlessChrome" in the User-Agent. (The autobrowse switches live in
+  // chrome/, so match by their raw names to avoid a layering dependency.)
+  const base::CommandLine* cmd = base::CommandLine::ForCurrentProcess();
+  const bool autobrowse =
+      cmd->HasSwitch("autobrowse-search") || cmd->HasSwitch("autobrowse");
+  if (cmd->HasSwitch(kHeadless) && !autobrowse) {
     product.insert(0, "Headless");
   }
 

@@ -387,6 +387,15 @@ source_set("uninstall_browser_prompt") {
 # circular includes from each other.
 static_library("ui") {
   sources = [
+    "autobrowse/autobrowse_fetch_runner.cc",
+    "autobrowse/autobrowse_fetch_runner.h",
+    "autobrowse/autobrowse_main_extra_parts.cc",
+    "autobrowse/autobrowse_main_extra_parts.h",
+    "autobrowse/autobrowse_scrape_runner.cc",
+    "autobrowse/autobrowse_scrape_runner.h",
+    "autobrowse/autobrowse_search_runner.cc",
+    "autobrowse/autobrowse_search_runner.h",
+    "autobrowse/autobrowse_switches.h",
     "confirm_bubble.h",
     "crypto_module_password_dialog.h",
     "enterprise_startup_dialog.h",
