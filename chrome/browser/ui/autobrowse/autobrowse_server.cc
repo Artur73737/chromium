@@ -9,6 +9,8 @@
 
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
+#include "base/json/json_writer.h"
+#include "base/json/string_escape.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/strings/string_split.h"
@@ -88,6 +90,12 @@ void AutobrowseServer::OnHttpRequest(int connection_id,
   }
   if (info.method != "POST") {
     server_->Send404(connection_id, TrafficAnnotation());
+    return;
+  }
+
+  // MCP JSON-RPC transport shares this server.
+  if (info.path == "/mcp") {
+    OnMcpRequest(connection_id, info.data);
     return;
   }
 
@@ -278,12 +286,113 @@ void AutobrowseServer::Reply(const Job& job,
   if (!server_) {
     return;
   }
+  if (job.is_mcp) {
+    // Wrap the command output as an MCP tool result (a single text content).
+    std::string text;
+    base::EscapeJSONString(body, /*put_in_quotes=*/true, &text);
+    const std::string resp = base::StrCat(
+        {R"({"jsonrpc":"2.0","id":)", job.mcp_id_json,
+         R"(,"result":{"content":[{"type":"text","text":)", text, "}]}}"});
+    server_->Send200(job.connection_id, resp, "application/json",
+                     TrafficAnnotation());
+    return;
+  }
   if (job.is_websocket) {
     server_->SendOverWebSocket(job.connection_id, body, TrafficAnnotation());
   } else {
     server_->Send200(job.connection_id, body, "application/json",
                      TrafficAnnotation());
   }
+}
+
+namespace {
+
+// The MCP tool catalog: one tool per autobrowse command.
+const char kMcpToolsResult[] = R"({"tools":[
+  {"name":"search","description":"Human-like web search (types the query letter-by-letter, no API). Returns result links.",
+   "inputSchema":{"type":"object","properties":{"query":{"type":"string"},"engine":{"type":"string"},"max_results":{"type":"integer"}},"required":["query"]}},
+  {"name":"fetch","description":"Load a page and evaluate JS (eval) or dump it (html|text|links|markdown).",
+   "inputSchema":{"type":"object","properties":{"url":{"type":"string"},"eval":{"type":"string"},"dump":{"type":"string"}},"required":["url"]}},
+  {"name":"scrape","description":"Scrape many URLs (comma-separated in 'urls'); eval or dump each.",
+   "inputSchema":{"type":"object","properties":{"urls":{"type":"string"},"eval":{"type":"string"},"dump":{"type":"string"}},"required":["urls"]}},
+  {"name":"monitor","description":"Read a page value once (selector + on_change JS).",
+   "inputSchema":{"type":"object","properties":{"url":{"type":"string"},"selector":{"type":"string"},"on_change":{"type":"string"}},"required":["url"]}},
+  {"name":"session-info","description":"Summarize the profile cookie jar.",
+   "inputSchema":{"type":"object","properties":{"top":{"type":"integer"}}}},
+  {"name":"warmup","description":"Mature the session by browsing an engine for 'minutes'.",
+   "inputSchema":{"type":"object","properties":{"engine":{"type":"string"},"minutes":{"type":"number"}}}}
+]})";
+
+}  // namespace
+
+void AutobrowseServer::OnMcpRequest(int connection_id,
+                                    const std::string& body) {
+  auto send = [&](const std::string& json) {
+    server_->Send200(connection_id, json, "application/json",
+                     TrafficAnnotation());
+  };
+
+  std::optional<base::Value> req =
+      base::JSONReader::Read(body, base::JSON_PARSE_RFC);
+  if (!req || !req->is_dict()) {
+    send(R"({"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"parse error"}})");
+    return;
+  }
+  base::DictValue& d = req->GetDict();
+  const std::string method = d.FindString("method") ? *d.FindString("method")
+                                                    : std::string();
+  std::string id_json = "null";
+  if (const base::Value* id = d.Find("id")) {
+    base::JSONWriter::Write(*id, &id_json);
+  }
+  auto result = [&](const std::string& result_json) {
+    send(base::StrCat({R"({"jsonrpc":"2.0","id":)", id_json, R"(,"result":)",
+                       result_json, "}"}));
+  };
+
+  if (method == "initialize") {
+    result(
+        R"({"protocolVersion":"2024-11-05","capabilities":{"tools":{}},)"
+        R"("serverInfo":{"name":"autobrowse","version":"1.0"}})");
+    return;
+  }
+  if (method.rfind("notifications/", 0) == 0) {
+    send("{}");  // Notifications take no result.
+    return;
+  }
+  if (method == "tools/list") {
+    result(kMcpToolsResult);
+    return;
+  }
+  if (method == "tools/call") {
+    const base::Value* params = d.Find("params");
+    if (!params || !params->is_dict()) {
+      send(base::StrCat({R"({"jsonrpc":"2.0","id":)", id_json,
+                         R"(,"error":{"code":-32602,"message":"bad params"}})"}));
+      return;
+    }
+    const std::string* name = params->GetDict().FindString("name");
+    if (!name) {
+      send(base::StrCat({R"({"jsonrpc":"2.0","id":)", id_json,
+                         R"(,"error":{"code":-32602,"message":"no tool name"}})"}));
+      return;
+    }
+    Job job;
+    job.command = *name;
+    job.connection_id = connection_id;
+    job.is_mcp = true;
+    job.mcp_id_json = id_json;
+    if (const base::Value* args = params->GetDict().Find("arguments")) {
+      if (args->is_dict()) {
+        job.params = args->GetDict().Clone();
+      }
+    }
+    Enqueue(std::move(job));
+    return;
+  }
+
+  send(base::StrCat({R"({"jsonrpc":"2.0","id":)", id_json,
+                     R"(,"error":{"code":-32601,"message":"unknown method"}})"}));
 }
 
 }  // namespace autobrowse

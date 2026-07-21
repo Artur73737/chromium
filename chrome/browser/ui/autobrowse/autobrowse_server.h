@@ -56,6 +56,8 @@ class AutobrowseServer : public net::HttpServer::Delegate {
     base::DictValue params;
     int connection_id = 0;
     bool is_websocket = false;
+    bool is_mcp = false;
+    std::string mcp_id_json;  // Raw JSON of the JSON-RPC request id.
   };
 
   void Enqueue(Job job);
@@ -64,6 +66,9 @@ class AutobrowseServer : public net::HttpServer::Delegate {
   void OnJobComplete(std::string result_json);
   void ResetRunners();
   void Reply(const Job& job, const std::string& body, bool ok);
+
+  // MCP (Model Context Protocol) JSON-RPC over POST /mcp.
+  void OnMcpRequest(int connection_id, const std::string& body);
 
   std::unique_ptr<net::HttpServer> server_;
   std::list<Job> queue_;

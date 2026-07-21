@@ -81,7 +81,8 @@ void AutobrowseMainExtraParts::PostBrowserStart() {
     StartSessionInfo();
   } else if (command == "warmup") {
     StartWarmup();
-  } else if (command == "serve" || command == "octo-serve") {
+  } else if (command == "serve" || command == "octo-serve" ||
+             command == "mcp") {
     StartServe();
   } else {
     fprintf(stderr, "[autobrowse] unknown command: %s\n", command.c_str());

@@ -314,6 +314,24 @@ curl -s localhost:8080/search -d '{"query":"python asyncio","engine":"google","m
 Ogni comando ha un `SetCompletionCallback` che consegna il risultato al server
 invece di stampare+uscire; lo stesso layer serve CLI, HTTP e WS.
 
+### `mcp` — server Model Context Protocol (IMPLEMENTATO)
+
+Transport MCP (JSON-RPC 2.0) sullo **stesso** server, su `POST /mcp`. Espone i
+comandi autobrowse come **tool MCP**, così un client (Claude Desktop, Cursor,
+…) può usarli. `--autobrowse=mcp` avvia il server (alias di `serve`); `/mcp` è
+disponibile anche quando parte con `--autobrowse=serve`.
+
+Metodi: `initialize`, `tools/list` (search/fetch/scrape/monitor/session-info/
+warmup con relativo `inputSchema`), `tools/call` (`{name, arguments}` → risultato
+come content testuale MCP). Le `notifications/*` sono accettate senza risultato.
+
+```bash
+chrome.exe --user-data-dir="E:/tmp/ab" --autobrowse=mcp --ab-port=8080 about:blank &
+curl -s localhost:8080/mcp -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+curl -s localhost:8080/mcp -d '{"jsonrpc":"2.0","id":2,"method":"tools/call",
+  "params":{"name":"fetch","arguments":{"url":"https://example.com","eval":"document.title"}}}'
+```
+
 ### Già nativi in Chromium (nessun codice nuovo)
 
 Alcuni comandi/flag globali di Obscura esistono già in Chrome:
@@ -329,10 +347,9 @@ Alcuni comandi/flag globali di Obscura esistono già in Chrome:
 
 | Obscura | Piano nativo | Stato |
 |---|---|---|
-| `octo-serve` (search via HTTP/WS) | **un unico** server HTTP+WS che espone **tutti** i comandi (search/fetch/scrape/monitor/session-info/warmup), non solo search; richiede il refactor dei core in servizi riusabili | ⏳ |
-| `mcp` | server MCP che espone i tool browser | ⏳ |
+Tutti i comandi del README sono ora implementati.
 
-> **Nota architettura.** Tre superfici distinte: **CLI** (`--autobrowse=<cmd>`, fatta), **CDP** (`--remote-debugging-port`, già nativa, separata), e **HTTP+WS** (un solo server per tutti i comandi, da fare). `--stealth` è trasversale a tutte.
+> **Nota architettura.** Tre superfici distinte: **CLI** (`--autobrowse=<cmd>`), **CDP** (`--remote-debugging-port`, già nativa, separata), e **HTTP+WS+MCP** (un solo server per tutti i comandi, `POST /<cmd>`, WebSocket, e `POST /mcp`). `--stealth` è trasversale a tutte.
 
 ---
 
