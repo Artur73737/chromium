@@ -48,6 +48,7 @@ inline constexpr char kAbOnChange[] = "ab-on-change";   // monitor: JS producing
 inline constexpr char kAbInterval[] = "ab-interval";    // monitor: poll interval seconds
 inline constexpr char kAbMaxRuns[] = "ab-max-runs";     // monitor: stop after N polls (0=forever)
 inline constexpr char kAbTop[] = "ab-top";              // session-info: top N domains
+inline constexpr char kAbMinutes[] = "ab-minutes";      // warmup: browse duration (minutes)
 
 }  // namespace switches
 }  // namespace autobrowse

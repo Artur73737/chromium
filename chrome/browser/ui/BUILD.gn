@@ -400,6 +400,8 @@ static_library("ui") {
     "autobrowse/autobrowse_session_info_runner.cc",
     "autobrowse/autobrowse_session_info_runner.h",
     "autobrowse/autobrowse_switches.h",
+    "autobrowse/autobrowse_warmup_runner.cc",
+    "autobrowse/autobrowse_warmup_runner.h",
     "confirm_bubble.h",
     "crypto_module_password_dialog.h",
     "enterprise_startup_dialog.h",

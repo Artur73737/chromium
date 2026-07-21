@@ -16,6 +16,7 @@
 #include "chrome/browser/ui/autobrowse/autobrowse_scrape_runner.h"
 #include "chrome/browser/ui/autobrowse/autobrowse_search_runner.h"
 #include "chrome/browser/ui/autobrowse/autobrowse_session_info_runner.h"
+#include "chrome/browser/ui/autobrowse/autobrowse_warmup_runner.h"
 #include "chrome/browser/ui/autobrowse/autobrowse_switches.h"
 
 namespace autobrowse {
@@ -77,6 +78,8 @@ void AutobrowseMainExtraParts::PostBrowserStart() {
     StartMonitor();
   } else if (command == "session-info") {
     StartSessionInfo();
+  } else if (command == "warmup") {
+    StartWarmup();
   } else {
     fprintf(stderr, "[autobrowse] unknown command: %s\n", command.c_str());
   }
@@ -180,6 +183,44 @@ void AutobrowseMainExtraParts::StartMonitor() {
   monitor_runner_ = std::make_unique<AutobrowseMonitorRunner>(
       url, selector, on_change, interval, max_runs, output_path);
   monitor_runner_->Start();
+}
+
+void AutobrowseMainExtraParts::StartWarmup() {
+  const base::CommandLine& cmd = *base::CommandLine::ForCurrentProcess();
+
+  std::string engine = cmd.GetSwitchValueASCII(switches::kAbEngine);
+  if (engine.empty()) {
+    engine = cmd.GetSwitchValueASCII(switches::kAutobrowseEngine);
+  }
+  if (engine.empty()) {
+    engine = "bing";
+  }
+
+  double minutes = 15.0;
+  if (cmd.HasSwitch(switches::kAbMinutes)) {
+    double parsed = 0;
+    if (base::StringToDouble(cmd.GetSwitchValueASCII(switches::kAbMinutes),
+                             &parsed) &&
+        parsed > 0) {
+      minutes = parsed;
+    }
+  }
+
+  std::vector<std::string> queries = base::SplitString(
+      cmd.GetSwitchValueASCII(switches::kAbQuery), ",", base::TRIM_WHITESPACE,
+      base::SPLIT_WANT_NONEMPTY);
+  if (queries.empty()) {
+    queries = {"rust programming", "weather today", "latest news",
+               "best laptops 2026", "how to cook pasta", "python tutorial"};
+  }
+
+  std::vector<std::string> urls = base::SplitString(
+      cmd.GetSwitchValueASCII(switches::kAbUrls), ", ", base::TRIM_WHITESPACE,
+      base::SPLIT_WANT_NONEMPTY);
+
+  warmup_runner_ = std::make_unique<AutobrowseWarmupRunner>(
+      std::move(engine), std::move(queries), std::move(urls), minutes);
+  warmup_runner_->Start();
 }
 
 void AutobrowseMainExtraParts::StartSessionInfo() {
