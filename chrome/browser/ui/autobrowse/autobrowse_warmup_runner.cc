@@ -11,6 +11,7 @@
 
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
+#include "base/json/json_writer.h"
 #include "base/json/string_escape.h"
 #include "base/rand_util.h"
 #include "base/strings/strcat.h"
@@ -261,9 +262,22 @@ void AutobrowseWarmupRunner::Finish() {
   pause_timer_.Stop();
   type_timer_.Stop();
   Observe(nullptr);
-  fprintf(stderr, "[warmup] done after %.1f min, %zu queries\n",
-          (base::TimeTicks::Now() - start_time_).InSecondsF() / 60.0,
+  const double mins = (base::TimeTicks::Now() - start_time_).InSecondsF() / 60.0;
+  fprintf(stderr, "[warmup] done after %.1f min, %zu queries\n", mins,
           query_index_);
+
+  // Server mode: report a summary and stay alive.
+  if (on_complete_) {
+    base::DictValue rec;
+    rec.Set("engine", engine_);
+    rec.Set("minutes", mins);
+    rec.Set("queries", static_cast<int>(query_index_));
+    std::string line;
+    base::JSONWriter::Write(base::Value(std::move(rec)), &line);
+    std::move(on_complete_).Run(line);
+    return;
+  }
+
   // Cookies are already persisted in the profile dir. Exit cleanly so the jar
   // is flushed.
   chrome::AttemptExit();

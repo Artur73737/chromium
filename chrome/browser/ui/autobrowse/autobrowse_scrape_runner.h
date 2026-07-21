@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "base/files/file_path.h"
+#include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
@@ -38,6 +39,11 @@ class AutobrowseScrapeRunner : public content::WebContentsObserver {
 
   void Start();
 
+  // Server mode: deliver the JSON array here instead of printing/exiting.
+  void SetCompletionCallback(base::OnceCallback<void(std::string)> cb) {
+    on_complete_ = std::move(cb);
+  }
+
  private:
   // content::WebContentsObserver:
   void DocumentOnLoadCompletedInPrimaryMainFrame() override;
@@ -52,6 +58,8 @@ class AutobrowseScrapeRunner : public content::WebContentsObserver {
   void AdvanceOrFinish();
   void Finish();
   void OnItemTimeout();
+
+  base::OnceCallback<void(std::string)> on_complete_;
 
   const std::vector<std::string> urls_;
   const std::string dump_;

@@ -16,6 +16,11 @@
 namespace autobrowse {
 
 class AutobrowseSearchRunner;
+class AutobrowseFetchRunner;
+class AutobrowseScrapeRunner;
+class AutobrowseMonitorRunner;
+class AutobrowseSessionInfoRunner;
+class AutobrowseWarmupRunner;
 
 // A single HTTP + WebSocket server that exposes every autobrowse command over
 // the network. `POST /<command>` (e.g. /search) takes a JSON body and returns a
@@ -55,7 +60,9 @@ class AutobrowseServer : public net::HttpServer::Delegate {
 
   void Enqueue(Job job);
   void MaybeRunNext();
+  bool StartCommand();  // Builds+starts the runner for current_; false if bad.
   void OnJobComplete(std::string result_json);
+  void ResetRunners();
   void Reply(const Job& job, const std::string& body, bool ok);
 
   std::unique_ptr<net::HttpServer> server_;
@@ -63,8 +70,13 @@ class AutobrowseServer : public net::HttpServer::Delegate {
   bool busy_ = false;
   Job current_;
 
-  // The runner for the in-flight job (only search is wired for now).
+  // The runner for the in-flight job (exactly one is set at a time).
   std::unique_ptr<AutobrowseSearchRunner> search_runner_;
+  std::unique_ptr<AutobrowseFetchRunner> fetch_runner_;
+  std::unique_ptr<AutobrowseScrapeRunner> scrape_runner_;
+  std::unique_ptr<AutobrowseMonitorRunner> monitor_runner_;
+  std::unique_ptr<AutobrowseSessionInfoRunner> session_info_runner_;
+  std::unique_ptr<AutobrowseWarmupRunner> warmup_runner_;
 
   base::WeakPtrFactory<AutobrowseServer> weak_factory_{this};
 };

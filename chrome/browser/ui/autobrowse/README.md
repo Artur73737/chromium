@@ -141,6 +141,12 @@ Output:
 
 In caso di muro il JSON riporta `"error"` (`blocked` / `timeout`) e `"reason"`.
 
+**Cookie consent.** Il driver rileva i banner di consenso (sia la pagina
+`consent.google.com` sia il dialog inline "before you continue") e clicca
+**sempre "Reject all"** — la scelta privacy-preserving — prima di procedere con
+la ricerca. (I CAPTCHA/"unusual traffic" non vengono aggirati: si recuperano con
+profilo caldo/`warmup`, `--fallback`, o proxy residenziale.)
+
 ### `fetch` — carica una pagina, dump o eval (IMPLEMENTATO)
 
 Naviga a un URL, attende il caricamento (+ settle opzionale), poi **valuta una
@@ -272,11 +278,11 @@ top domains:
      10  bing.com
 ```
 
-### `serve` — server HTTP + WebSocket unificato (IN CORSO)
+### `serve` — server HTTP + WebSocket unificato (IMPLEMENTATO)
 
-Un **unico** server (`net::HttpServer`, che gestisce HTTP e WS insieme) espone i
-comandi autobrowse sulla rete. Poiché i comandi pilotano l'unico tab attivo, le
-richieste sono **serializzate** (una alla volta, le altre in coda).
+Un **unico** server (`net::HttpServer`, che gestisce HTTP e WS insieme) espone
+**tutti** i comandi autobrowse sulla rete. Poiché pilotano l'unico tab attivo,
+le richieste sono **serializzate** (una alla volta, le altre in coda).
 
 | Switch | Default | Descrizione |
 |---|---|---|
@@ -285,17 +291,28 @@ richieste sono **serializzate** (una alla volta, le altre in coda).
 
 - `GET /health` → `ok`.
 - `POST /<comando>` con body JSON → risultato JSON. WebSocket: una frame JSON di
-  richiesta (`{"command":"search",...}`) → una frame JSON di risposta.
+  richiesta (`{"command":"<cmd>",...}`) → una frame JSON di risposta.
+
+Comandi esposti e campi del body JSON:
+
+| Endpoint | Campi JSON |
+|---|---|
+| `/search` | `query` (obbl.), `engine`, `max_results` |
+| `/fetch` | `url` (obbl.), `eval`, `dump`, `selector`, `wait`, `timeout` |
+| `/scrape` | `urls` (obbl., separati da virgola), `eval`, `dump`, `wait`, `timeout` |
+| `/monitor` | `url` (obbl.), `selector`, `on_change` — **un solo poll**, ritorna il valore |
+| `/session-info` | `top` |
+| `/warmup` | `engine`, `minutes`, `query`, `urls` |
 
 ```bash
 chrome.exe --user-data-dir="E:/tmp/ab" --autobrowse=serve --ab-port=8080 about:blank &
+curl -s localhost:8080/fetch  -d '{"url":"https://example.com","eval":"document.title"}'
+curl -s localhost:8080/scrape -d '{"urls":"https://a.com,https://b.com","eval":"document.title"}'
 curl -s localhost:8080/search -d '{"query":"python asyncio","engine":"google","max_results":3}'
 ```
 
-**Stato:** infrastruttura HTTP+WS pronta e `search` collegato e testato. I
-restanti comandi (fetch/scrape/monitor/session-info/warmup) si agganciano allo
-stesso dispatch aggiungendo la callback di completamento ai rispettivi runner
-(come già fatto per search).
+Ogni comando ha un `SetCompletionCallback` che consegna il risultato al server
+invece di stampare+uscire; lo stesso layer serve CLI, HTTP e WS.
 
 ### Già nativi in Chromium (nessun codice nuovo)
 

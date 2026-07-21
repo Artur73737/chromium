@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
@@ -35,6 +36,11 @@ class AutobrowseWarmupRunner : public content::WebContentsObserver {
 
   void Start();
 
+  // Server mode: deliver a summary here instead of exiting when done.
+  void SetCompletionCallback(base::OnceCallback<void(std::string)> cb) {
+    on_complete_ = std::move(cb);
+  }
+
  private:
   enum class Phase { kIdle, kHome, kSerp, kResult, kTargetUrl };
 
@@ -53,6 +59,8 @@ class AutobrowseWarmupRunner : public content::WebContentsObserver {
   void OnFirstResult(base::Value value);
   bool PastDeadline() const;
   void Finish();
+
+  base::OnceCallback<void(std::string)> on_complete_;
 
   const std::string engine_;
   const std::vector<std::string> queries_;

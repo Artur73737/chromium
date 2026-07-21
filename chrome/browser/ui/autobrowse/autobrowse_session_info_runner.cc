@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "base/functional/bind.h"
+#include "base/strings/stringprintf.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
@@ -29,16 +30,14 @@ AutobrowseSessionInfoRunner::~AutobrowseSessionInfoRunner() = default;
 void AutobrowseSessionInfoRunner::Start() {
   Profile* profile = ProfileManager::GetLastUsedProfileIfLoaded();
   if (!profile) {
-    fprintf(stderr, "[autobrowse] session-info: no active profile\n");
-    chrome::AttemptExit();
+    Deliver("{\"error\":\"no active profile\"}\n");
     return;
   }
   network::mojom::CookieManager* cookie_manager =
       profile->GetDefaultStoragePartition()
           ->GetCookieManagerForBrowserProcess();
   if (!cookie_manager) {
-    fprintf(stderr, "[autobrowse] session-info: no cookie manager\n");
-    chrome::AttemptExit();
+    Deliver("{\"error\":\"no cookie manager\"}\n");
     return;
   }
   cookie_manager->GetAllCookies(
@@ -71,10 +70,10 @@ void AutobrowseSessionInfoRunner::OnGotCookies(
     ++per_domain[domain];
   }
 
-  fprintf(stdout, "cookies: %zu total (%zu domains) - %d persistent, "
-                  "%d session, %d secure, %d expired\n",
-          cookies.size(), per_domain.size(), persistent, session, secure,
-          expired);
+  std::string out = base::StringPrintf(
+      "cookies: %zu total (%zu domains) - %d persistent, %d session, "
+      "%d secure, %d expired\n",
+      cookies.size(), per_domain.size(), persistent, session, secure, expired);
 
   // Top domains by cookie count.
   std::vector<std::pair<std::string, int>> sorted(per_domain.begin(),
@@ -83,21 +82,30 @@ void AutobrowseSessionInfoRunner::OnGotCookies(
             [](const auto& a, const auto& b) { return a.second > b.second; });
 
   const int top = top_ > 0 ? top_ : 15;
-  fprintf(stdout, "top domains:\n");
+  out += "top domains:\n";
   int shown = 0;
   for (const auto& [domain, count] : sorted) {
     if (shown >= top) {
       break;
     }
-    fprintf(stdout, "  %5d  %s\n", count, domain.c_str());
+    out += base::StringPrintf("  %5d  %s\n", count, domain.c_str());
     ++shown;
   }
   const int remaining = static_cast<int>(sorted.size()) - shown;
   if (remaining > 0) {
-    fprintf(stdout, "  ... and %d more\n", remaining);
+    out += base::StringPrintf("  ... and %d more\n", remaining);
   }
-  fflush(stdout);
 
+  Deliver(out);
+}
+
+void AutobrowseSessionInfoRunner::Deliver(const std::string& text) {
+  if (on_complete_) {
+    std::move(on_complete_).Run(text);
+    return;
+  }
+  fprintf(stdout, "%s", text.c_str());
+  fflush(stdout);
   chrome::AttemptExit();
 }
 

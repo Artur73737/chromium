@@ -5,8 +5,10 @@
 #ifndef CHROME_BROWSER_UI_AUTOBROWSE_AUTOBROWSE_SESSION_INFO_RUNNER_H_
 #define CHROME_BROWSER_UI_AUTOBROWSE_AUTOBROWSE_SESSION_INFO_RUNNER_H_
 
+#include <string>
 #include <vector>
 
+#include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
 
 namespace net {
@@ -27,9 +29,16 @@ class AutobrowseSessionInfoRunner {
 
   void Start();
 
+  // Server mode: deliver the summary text here instead of printing/exiting.
+  void SetCompletionCallback(base::OnceCallback<void(std::string)> cb) {
+    on_complete_ = std::move(cb);
+  }
+
  private:
   void OnGotCookies(const std::vector<net::CanonicalCookie>& cookies);
+  void Deliver(const std::string& text);
 
+  base::OnceCallback<void(std::string)> on_complete_;
   const int top_;
   base::WeakPtrFactory<AutobrowseSessionInfoRunner> weak_factory_{this};
 };

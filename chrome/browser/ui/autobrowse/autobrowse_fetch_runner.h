@@ -8,6 +8,7 @@
 #include <string>
 
 #include "base/files/file_path.h"
+#include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
@@ -38,6 +39,11 @@ class AutobrowseFetchRunner : public content::WebContentsObserver {
 
   ~AutobrowseFetchRunner() override;
 
+  // Server mode: deliver the output here instead of printing/exiting.
+  void SetCompletionCallback(base::OnceCallback<void(std::string)> cb) {
+    on_complete_ = std::move(cb);
+  }
+
   // Finds the active tab (retrying until one exists) and navigates to the URL.
   void Start();
 
@@ -54,6 +60,8 @@ class AutobrowseFetchRunner : public content::WebContentsObserver {
   void OnExtractResult(base::Value value);
   void Finish(const std::string& output);
   void OnTimeout();
+
+  base::OnceCallback<void(std::string)> on_complete_;
 
   const std::string url_;
   const std::string dump_;

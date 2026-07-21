@@ -170,6 +170,12 @@ void AutobrowseFetchRunner::Finish(const std::string& output) {
   finished_ = true;
   deadline_timer_.Stop();
   settle_timer_.Stop();
+  Observe(nullptr);
+
+  if (on_complete_) {
+    std::move(on_complete_).Run(output);
+    return;
+  }
 
   if (output_path_.empty()) {
     fprintf(stdout, "%s\n", output.c_str());

@@ -8,6 +8,7 @@
 #include <string>
 
 #include "base/files/file_path.h"
+#include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
@@ -37,6 +38,12 @@ class AutobrowseMonitorRunner : public content::WebContentsObserver {
 
   void Start();
 
+  // Server mode: deliver the first extracted value here (single poll) instead
+  // of streaming NDJSON, then stop.
+  void SetCompletionCallback(base::OnceCallback<void(std::string)> cb) {
+    on_complete_ = std::move(cb);
+  }
+
  private:
   // content::WebContentsObserver:
   void DocumentOnLoadCompletedInPrimaryMainFrame() override;
@@ -49,6 +56,8 @@ class AutobrowseMonitorRunner : public content::WebContentsObserver {
   void OnExtractResult(base::Value value);
   void ScheduleNextOrStop();
   void Stop();
+
+  base::OnceCallback<void(std::string)> on_complete_;
 
   const std::string url_;
   const std::string selector_;

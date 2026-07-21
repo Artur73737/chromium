@@ -267,12 +267,26 @@ std::string AutobrowseSearchRunner::BuildDriverScript() const {
       "  const E=", e, ";",
       "  const host=location.host, path=location.pathname;",
       "  const body=document.body?document.body.innerText:'';",
+      // Cookie consent: ALWAYS reject (privacy-preserving). A dedicated finder
+      // matches a 'reject all' control by text/aria-label; used both on the
+      // consent.google.com wall and on an inline 'before you continue' dialog.
+      "  function findReject(){",
+      "    const els=[...document.querySelectorAll('button,input[type=submit],"
+      "div[role=button],a[role=button],[aria-label]')];",
+      "    const rx=/^(reject all|reject|rifiuta tutto|rifiuta|tout refuser|"
+      "alle ablehnen|ablehnen|decline|no,? thanks)$/i;",
+      "    return els.find(x=>rx.test(((x.textContent||x.value||"
+      "x.getAttribute('aria-label')||'').trim())));",
+      "  }",
       "  if(host.indexOf('consent')>=0){",
-      "    const bs=[...document.querySelectorAll('button,input[type=submit],div[role=button]')];",
-      "    const b=bs.find(x=>/reject all|accept all|accetta tutto|rifiuta tutto|i agree|acconsento/i"
-      ".test((x.textContent||x.value||'')));",
+      "    const b=findReject()||[...document.querySelectorAll('button,"
+      "input[type=submit],div[role=button]')].find(x=>/reject|rifiuta|ablehnen|"
+      "refuser|decline/i.test((x.textContent||x.value||'')));",
       "    if(b){b.click();return 'CONSENT';} return 'WAIT';",
       "  }",
+      // Inline consent dialog on a normal page: reject once, then carry on.
+      "  if(!window.__ab_consent){const r=findReject();"
+      "if(r){window.__ab_consent=1;r.click();return 'CONSENT';}}",
       "  if(host.indexOf('sorry')>=0||/unusual traffic|detected unusual|are not a robot/i.test(body)){",
       "    return JSON.stringify({query:Q,engine:E,error:'blocked',"
       "reason:'captcha / unusual-traffic wall',results:[]});",

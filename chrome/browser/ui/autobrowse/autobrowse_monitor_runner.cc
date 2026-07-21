@@ -143,6 +143,22 @@ void AutobrowseMonitorRunner::OnExtractResult(base::Value value) {
     base::JSONWriter::Write(value, &value_str);
   }
 
+  // Server mode: one poll, return the value, done.
+  if (on_complete_) {
+    base::DictValue rec;
+    rec.Set("url", url_);
+    rec.Set("value", value_str);
+    std::string line;
+    base::JSONWriter::Write(base::Value(std::move(rec)), &line);
+    std::move(on_complete_).Run(line);
+    // Stop watching without exiting the process (the server stays alive).
+    stopped_ = true;
+    attach_timer_.Stop();
+    interval_timer_.Stop();
+    Observe(nullptr);
+    return;
+  }
+
   const size_t hash = std::hash<std::string>{}(value_str);
   const bool changed = !have_last_ || hash != last_hash_;
   if (changed) {

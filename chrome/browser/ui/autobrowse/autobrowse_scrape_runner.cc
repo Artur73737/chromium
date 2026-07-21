@@ -199,6 +199,12 @@ void AutobrowseScrapeRunner::Finish() {
       base::Value(std::move(out)), base::JSONWriter::OPTIONS_PRETTY_PRINT,
       &pretty);
 
+  Observe(nullptr);
+  if (on_complete_) {
+    std::move(on_complete_).Run(pretty);
+    return;
+  }
+
   if (output_path_.empty()) {
     fprintf(stdout, "%s\n", pretty.c_str());
     fflush(stdout);
