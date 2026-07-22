@@ -105,6 +105,33 @@ Le run di autobrowse silenziano i log di servizio così lo stdout resta pulito.
 Per vedere il traffico interno (stati del driver di ricerca, ack DevTools dello
 stealth) esporta `AB_DEBUG=1` prima di lanciare.
 
+### Installer (Windows)
+
+L'installer ufficiale di Chromium è il target `mini_installer`, che produce un
+eseguibile auto-installante:
+
+```bat
+call E:\project-seri\chromium\env.bat
+cd /d E:\project-seri\chromium\src
+autoninja -C out\Default mini_installer -j 6
+```
+
+Output:
+
+```
+E:\project-seri\chromium\src\out\Default\mini_installer.exe
+```
+
+**Nota dimensione.** Con il build di sviluppo (`is_component_build=true`)
+l'installer è grande (~600 MB) perché impacchetta tutte le DLL dei componenti.
+Per un installer snello e distribuibile (~150–200 MB, link statico, ottimizzato)
+serve un release build non-component in una out-dir separata (build da zero, ore):
+
+```bat
+gn gen out\Release --args="is_official_build=true is_component_build=false chrome_pgo_phase=0 enable_nacl=false"
+autoninja -C out\Release mini_installer
+```
+
 ---
 
 ## 2. Come si lancia — le 3 superfici
