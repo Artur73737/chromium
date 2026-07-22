@@ -53,6 +53,7 @@ class AutobrowseMonitorRunner : public content::WebContentsObserver {
   void TryAttach();
   void LoadOnce();
   void RunExtract();
+  void OnPollTimeout();
   void OnExtractResult(base::Value value);
   void ScheduleNextOrStop();
   void Stop();
@@ -75,6 +76,7 @@ class AutobrowseMonitorRunner : public content::WebContentsObserver {
 
   base::RepeatingTimer attach_timer_;
   base::OneShotTimer interval_timer_;
+  base::OneShotTimer poll_deadline_timer_;
 
   base::WeakPtrFactory<AutobrowseMonitorRunner> weak_factory_{this};
 };

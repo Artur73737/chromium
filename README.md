@@ -23,9 +23,9 @@ If you found a bug, please file it at https://crbug.com/new.
 ---
 ---
 
-# Autobrowse — Obscura, nativo in Chromium (branch `octo`)
+# Autobrowse — automazione browser nativa in Chromium (branch `octo`)
 
-**Autobrowse** porta l'intera superficie di comandi di *Obscura* dentro
+**Autobrowse** aggiunge una superficie di comandi di automazione dentro
 Chromium, **in C++ nativo**. La ricerca e la navigazione sono **umane**: la
 query viene digitata nella barra di ricerca **lettera per lettera** (eventi
 `InputEvent`/`KeyboardEvent`), si preme Invio, e i link dei risultati vengono
@@ -113,15 +113,15 @@ Ci sono **tre superfici distinte** per pilotare il browser:
 
 | Superficie | Come | Note |
 |---|---|---|
-| **CLI** | `--autobrowse=<cmd>` + switch `--ab-*` | i comandi qui sotto |
+| **CLI** | `--autobrowse=<cmd>` + switch `--*` | i comandi qui sotto |
 | **CDP** | `--remote-debugging-port=9222` | **già nativo**, per Puppeteer/Playwright; separato |
-| **HTTP + WS + MCP** | `--autobrowse=serve --ab-port=8080` | un solo server per tutti i comandi |
+| **HTTP + WS + MCP** | `--autobrowse=serve --port=8080` | un solo server per tutti i comandi |
 
 ### Forma dei comandi CLI
 
 Due forme equivalenti:
 
-* **Sub-comando unico** (preferito): `--autobrowse=<cmd>` con input via `--ab-*`.
+* **Sub-comando unico** (preferito): `--autobrowse=<cmd>` con input via `--*`.
 * **Scorciatoia legacy** per la ricerca: `--autobrowse-search="query"`.
 
 L'ultimo argomento è sempre una pagina qualsiasi, es. `about:blank` (serve solo
@@ -140,20 +140,20 @@ modalità; cambia solo la visibilità della finestra e l'uscita del processo.
 ### Sessione / profilo
 
 Il profilo `--user-data-dir=DIR` **è** la sessione: i cookie persistono tra i
-run (equivalente al `--session` di Obscura). Un profilo "caldo" (con cookie
+run (una sessione persistente). Un profilo "caldo" (con cookie
 dell'engine già presenti) alza molto l'affidabilità anti-bot. Un profilo freddo
 su Google può incontrare consent-wall/captcha per reputazione IP (datacenter).
 
 ### Flag globali nativi utili
 
-| Flag nativo | Equivalente Obscura |
+| Flag nativo | Uso |
 |---|---|
-| `--proxy-server="socks5://127.0.0.1:1080"` | `--proxy` |
-| `--user-agent="..."` | `--user-agent` |
-| `--user-data-dir=DIR` | `--session DIR` |
-| `--remote-debugging-port=9222` | `serve` (CDP) |
-| `--stealth` | `--stealth` (vedi §5) |
-| `--headless` | headless |
+| `--proxy-server="socks5://127.0.0.1:1080"` | instrada tutto via proxy HTTP/SOCKS5 |
+| `--user-agent="..."` | override dello User-Agent |
+| `--user-data-dir=DIR` | profilo/sessione persistente |
+| `--remote-debugging-port=9222` | server CDP (Puppeteer/Playwright) |
+| `--stealth` | anti-fingerprint completo (vedi §5) |
+| `--headless` | esegue senza finestra |
 
 ---
 
@@ -163,16 +163,16 @@ su Google può incontrare consent-wall/captcha per reputazione IP (datacenter).
 
 Naviga la home del motore, digita la query **lettera per lettera**, preme Invio,
 gestisce consent-wall e captcha, ed estrae i primi risultati (titolo, url,
-snippet). Output JSON Obscura-style. In GUI la finestra resta sui risultati.
+snippet). Output JSON. In GUI la finestra resta sui risultati.
 
 | Switch | Default | Descrizione |
 |---|---|---|
 | `--autobrowse=search` / `--autobrowse-search="Q"` | — | Attiva; la 2ª forma passa anche la query. |
-| `--ab-query="Q"` | — | Query (se non passata dalla forma legacy). |
-| `--ab-engine=<e>` / `--autobrowse-engine=<e>` | `google` | `google` \| `bing` \| `duckduckgo`. |
-| `--ab-max-results=N` / `--autobrowse-max-results=N` | `10` | Numero massimo di risultati. |
-| `--ab-scrape=<kind>` | — | Dopo aver raccolto i link, **apre ogni risultato** e ne estrae il contenuto (`text` \| `html` \| `links`), allegandolo come campo `scraped` a ciascun risultato. |
-| `--ab-output=FILE` / `--autobrowse-output=FILE` | stdout | Scrive il JSON su file (altrimenti stdout). |
+| `--query="Q"` | — | Query (se non passata dalla forma legacy). |
+| `--engine=<e>` / `--autobrowse-engine=<e>` | `google` | `google` \| `bing` \| `duckduckgo`. |
+| `--max-results=N` / `--autobrowse-max-results=N` | `10` | Numero massimo di risultati. |
+| `--scrape=<kind>` | — | Dopo aver raccolto i link, **apre ogni risultato** e ne estrae il contenuto (`text` \| `html` \| `links`), allegandolo come campo `scraped` a ciascun risultato. |
+| `--output=FILE` / `--autobrowse-output=FILE` | stdout | Scrive il JSON su file (altrimenti stdout). |
 
 ```bash
 # GUI, Google (resta aperta sui risultati)
@@ -181,15 +181,15 @@ chrome.exe --user-data-dir="E:/tmp/ab" \
 
 # headless, profilo caldo
 chrome.exe --headless --user-data-dir="E:/tmp/ab" \
-  --autobrowse=search --ab-query="rust tokio" --ab-engine=google --ab-max-results=5
+  --autobrowse=search --query="rust tokio" --engine=google --max-results=5
 
 # raccogli i link E scrape del testo di ogni pagina, salva su file JSON
 chrome.exe --headless --user-data-dir="E:/tmp/ab" \
-  --autobrowse=search --ab-query="rust tokio" --ab-engine=google --ab-max-results=5 \
-  --ab-scrape=text --ab-output="E:/tmp/out.json"
+  --autobrowse=search --query="rust tokio" --engine=google --max-results=5 \
+  --scrape=text --output="E:/tmp/out.json"
 ```
 
-Con `--ab-scrape` ogni risultato guadagna un campo `scraped`:
+Con `--scrape` ogni risultato guadagna un campo `scraped`:
 ```json
 {
    "count": 2,
@@ -221,50 +221,51 @@ Vedi [§6](#6-cookie-consent-reject-all) per la gestione del consenso cookie.
 ### `fetch` — carica una pagina, dump o eval
 
 Naviga a un URL, attende il caricamento (+ settle opzionale), poi **valuta una
-espressione JS** (`--ab-eval`, in isolated world) oppure **dumpa** la pagina
+espressione JS** (`--eval`, in isolated world) oppure **dumpa** la pagina
 renderizzata.
 
 | Switch | Default | Descrizione |
 |---|---|---|
 | `--autobrowse=fetch` | — | Attiva il comando. |
-| `--ab-url=URL` | — (**obbligatorio**) | Pagina da caricare. |
-| `--ab-eval="EXPR"` | — | Espressione JS; ne stampa il valore. Ha priorità su `--ab-dump`. |
-| `--ab-dump=<fmt>` | `html` | `html` \| `text` \| `links` \| `markdown`. |
-| `--ab-wait=SEC` | `0` | Attesa extra dopo il load, per contenuti async. |
-| `--ab-timeout=SEC` | `30` | Timeout di navigazione. |
-| `--ab-output=FILE` | stdout | Scrive l'output su file. |
+| `--url=URL` | — (**obbligatorio**) | Pagina da caricare. |
+| `--eval="EXPR"` | — | Espressione JS; ne stampa il valore. Ha priorità su `--dump`. |
+| `--dump=<fmt>` | `html` | `html` \| `text` \| `links` \| `markdown`. |
+| `--wait=SEC` | `0` | Attesa extra dopo il load, per contenuti async. |
+| `--timeout=SEC` | `30` | Timeout di navigazione. |
+| `--output=FILE` | stdout | Scrive l'output su file. |
 
-`--ab-dump`: `html` = outerHTML del documento renderizzato; `text` =
+`--dump`: `html` = outerHTML del documento renderizzato; `text` =
 `body.innerText`; `links` = un `{text, href}` JSON per riga; `markdown` =
 DOM→Markdown (heading, liste, link, code).
 
 ```bash
-chrome.exe --headless --autobrowse=fetch --ab-url="https://example.com" --ab-eval="document.title"
-chrome.exe --headless --autobrowse=fetch --ab-url="https://example.com" --ab-dump=text
-chrome.exe --headless --autobrowse=fetch --ab-url="https://example.com" --ab-dump=links
-chrome.exe --headless --autobrowse=fetch --ab-url="https://example.com" --ab-dump=markdown
+chrome.exe --headless --autobrowse=fetch --url="https://example.com" --eval="document.title"
+chrome.exe --headless --autobrowse=fetch --url="https://example.com" --dump=text
+chrome.exe --headless --autobrowse=fetch --url="https://example.com" --dump=links
+chrome.exe --headless --autobrowse=fetch --url="https://example.com" --dump=markdown
 ```
 
-### `scrape` — molti URL, un eval/dump ciascuno
+### `scrape` — molti URL **in parallelo**, un eval/dump ciascuno
 
-Naviga in sequenza una lista di URL nel tab attivo; per ognuno attende il
-render, valuta `--ab-eval` (o dumpa con `--ab-dump`) e raccoglie un record.
-Emette un JSON array. Un URL lento/rotto va in `"error":"timeout"` e non blocca
-il resto.
+Apre fino a `--concurrency` **tab off-screen** in un solo processo, ognuno naviga
+a un URL, attende il render e valuta `--eval` (o dumpa con `--dump`). I risultati
+sono raccolti nell'ordine originale ed emessi come JSON array. Un URL lento/rotto
+va in `"error":"timeout"` e non blocca gli altri.
 
 | Switch | Default | Descrizione |
 |---|---|---|
 | `--autobrowse=scrape` | — | Attiva il comando. |
-| `--ab-urls="u1,u2,..."` | — (**obbligatorio**) | URL separati da virgola/spazio. |
-| `--ab-eval="EXPR"` | — | JS valutato su ogni pagina. Priorità su `--ab-dump`. |
-| `--ab-dump=<fmt>` | `text` | `text` \| `html` \| `links`. |
-| `--ab-wait=SEC` | `0` | Settle extra per pagina. |
-| `--ab-timeout=SEC` | `30` | Timeout per pagina. |
-| `--ab-output=FILE` | stdout | Scrive su file. |
+| `--urls="u1,u2,..."` | — (**obbligatorio**) | URL separati da virgola/spazio. |
+| `--concurrency=N` | `4` | Numero di tab in parallelo. |
+| `--eval="EXPR"` | — | JS valutato su ogni pagina. Priorità su `--dump`. |
+| `--dump=<fmt>` | `text` | `text` \| `html` \| `links`. |
+| `--wait=SEC` | `0` | Settle extra per pagina. |
+| `--timeout=SEC` | `30` | Timeout per pagina. |
+| `--output=FILE` | stdout | Scrive su file. |
 
 ```bash
-chrome.exe --headless --autobrowse=scrape \
-  --ab-urls="https://example.com,https://example.org" --ab-eval="document.title"
+chrome.exe --headless --autobrowse=scrape --concurrency=4 \
+  --urls="https://example.com,https://example.org" --eval="document.title"
 ```
 ```json
 {
@@ -279,23 +280,23 @@ chrome.exe --headless --autobrowse=scrape \
 
 ### `monitor` — watch pagina, NDJSON sui cambiamenti
 
-Ricarica l'URL a intervallo, estrae un valore da `--ab-selector` valutando
-`--ab-on-change` (con l'elemento in scope, così `textContent` funziona nudo),
+Ricarica l'URL a intervallo, estrae un valore da `--selector` valutando
+`--on-change` (con l'elemento in scope, così `textContent` funziona nudo),
 ne calcola l'hash ed emette una riga NDJSON **solo quando cambia**.
 
 | Switch | Default | Descrizione |
 |---|---|---|
 | `--autobrowse=monitor` | — | Attiva il comando. |
-| `--ab-url=URL` | — (**obbligatorio**) | Pagina da osservare. |
-| `--ab-selector=CSS` | `<body>` | Elemento da osservare. |
-| `--ab-on-change="JS"` | `textContent` | JS che produce il valore (elemento in scope). |
-| `--ab-interval=SEC` | `60` | Intervallo di polling. |
-| `--ab-max-runs=N` | `0` (sempre) | Stop dopo N poll. |
-| `--ab-output=FILE` | stdout | Appende le righe NDJSON su file. |
+| `--url=URL` | — (**obbligatorio**) | Pagina da osservare. |
+| `--selector=CSS` | `<body>` | Elemento da osservare. |
+| `--on-change="JS"` | `textContent` | JS che produce il valore (elemento in scope). |
+| `--interval=SEC` | `60` | Intervallo di polling. |
+| `--max-runs=N` | `0` (sempre) | Stop dopo N poll. |
+| `--output=FILE` | stdout | Appende le righe NDJSON su file. |
 
 ```bash
-chrome.exe --headless --autobrowse=monitor --ab-url="https://example.com" \
-  --ab-selector="h1" --ab-interval=30 --ab-max-runs=5
+chrome.exe --headless --autobrowse=monitor --url="https://example.com" \
+  --selector="h1" --interval=30 --max-runs=5
 ```
 ```json
 {"t":"1784658645703","url":"https://example.com","value":"Example Domain"}
@@ -310,10 +311,10 @@ cookie. Legge via `CookieManager` del profilo — niente navigazione, niente API
 | Switch | Default | Descrizione |
 |---|---|---|
 | `--autobrowse=session-info` | — | Attiva il comando. |
-| `--ab-top=N` | `15` | Quanti top domini elencare. |
+| `--top=N` | `15` | Quanti top domini elencare. |
 
 ```bash
-chrome.exe --headless --user-data-dir="E:/tmp/ab" --autobrowse=session-info --ab-top=10
+chrome.exe --headless --user-data-dir="E:/tmp/ab" --autobrowse=session-info --top=10
 ```
 ```
 cookies: 103 total (30 domains) - 67 persistent, 36 session, 79 secure, 1 expired
@@ -326,20 +327,20 @@ top domains:
 
 Naviga davvero il motore per N minuti: digita query reali lettera-per-lettera,
 apre il primo risultato di ognuna, fa pause naturali (randomizzate), opzional-
-mente visita URL tuoi (`--ab-urls`), e i cookie si accumulano nel profilo. È
+mente visita URL tuoi (`--urls`), e i cookie si accumulano nel profilo. È
 storia di visitatore-di-ritorno **autentica**, non fabbricata.
 
 | Switch | Default | Descrizione |
 |---|---|---|
 | `--autobrowse=warmup` | — | Attiva il comando. |
-| `--ab-engine=<e>` | `bing` | `google` \| `bing` \| `duckduckgo`. |
-| `--ab-minutes=N` | `15` | Durata (accetta frazioni, es. `0.5`). |
-| `--ab-query="q1,q2"` | set generico | Query da usare (separate da virgola). |
-| `--ab-urls="u1,u2"` | — | URL target da visitare, interlacciati. |
+| `--engine=<e>` | `bing` | `google` \| `bing` \| `duckduckgo`. |
+| `--minutes=N` | `15` | Durata (accetta frazioni, es. `0.5`). |
+| `--query="q1,q2"` | set generico | Query da usare (separate da virgola). |
+| `--urls="u1,u2"` | — | URL target da visitare, interlacciati. |
 
 ```bash
 chrome.exe --headless --user-data-dir="E:/tmp/ab" \
-  --autobrowse=warmup --ab-engine=google --ab-minutes=15
+  --autobrowse=warmup --engine=google --minutes=15
 ```
 Progresso su stderr:
 ```
@@ -380,8 +381,8 @@ I client-hint (`sec-ch-ua`) in `--headless=new` derivano già dal nome prodotto
 Verifica:
 ```bash
 # atteso: Chrome/…  (NON HeadlessChrome/…)
-chrome.exe --headless --autobrowse=fetch --ab-url="https://example.com" \
-  --ab-eval="navigator.userAgent"
+chrome.exe --headless --autobrowse=fetch --url="https://example.com" \
+  --eval="navigator.userAgent"
 ```
 
 > Nota: la parità di fingerprint non elimina il muro captcha su un **profilo
@@ -442,8 +443,8 @@ Verifica (lo script inline della pagina gira nel main world a parse-time, quindi
 ```bash
 # hc=8, deviceMemory=8, webdriver=undefined (omesso da JSON.stringify)
 chrome.exe --headless --stealth --autobrowse=fetch \
-  --ab-url="data:text/html,<body></body><script>document.body.textContent=JSON.stringify({webdriver:navigator.webdriver,plugins:navigator.plugins.length,hc:navigator.hardwareConcurrency,mem:navigator.deviceMemory})</script>" \
-  --ab-dump=text
+  --url="data:text/html,<body></body><script>document.body.textContent=JSON.stringify({webdriver:navigator.webdriver,plugins:navigator.plugins.length,hc:navigator.hardwareConcurrency,mem:navigator.deviceMemory})</script>" \
+  --dump=text
 ```
 
 `--stealth` è **trasversale**: vale per search, fetch, scrape, monitor, warmup e
@@ -477,7 +478,7 @@ in coda). Il server resta vivo (in GUI la finestra resta aperta).
 | Switch | Default | Descrizione |
 |---|---|---|
 | `--autobrowse=serve` | — | Avvia il server. |
-| `--ab-port=N` | `8080` | Porta HTTP/WS (bind su `127.0.0.1`). |
+| `--port=N` | `8080` | Porta HTTP/WS (bind su `127.0.0.1`). |
 
 * `GET /health` → `ok`.
 * `POST /<comando>` con body JSON → risultato JSON.
@@ -490,13 +491,13 @@ Comandi esposti e campi del body JSON:
 |---|---|
 | `/search` | `query` (obbl.), `engine`, `max_results`, `scrape` (`text`\|`html`\|`links`) |
 | `/fetch` | `url` (obbl.), `eval`, `dump`, `selector`, `wait`, `timeout` |
-| `/scrape` | `urls` (obbl., separati da virgola), `eval`, `dump`, `wait`, `timeout` |
+| `/scrape` | `urls` (obbl.), `concurrency`, `eval`, `dump`, `wait`, `timeout` |
 | `/monitor` | `url` (obbl.), `selector`, `on_change` — **un solo poll**, ritorna il valore |
 | `/session-info` | `top` |
 | `/warmup` | `engine`, `minutes`, `query`, `urls` |
 
 ```bash
-chrome.exe --user-data-dir="E:/tmp/ab" --autobrowse=serve --ab-port=8080 about:blank &
+chrome.exe --user-data-dir="E:/tmp/ab" --autobrowse=serve --port=8080 about:blank &
 curl -s localhost:8080/health
 curl -s localhost:8080/fetch  -d '{"url":"https://example.com","eval":"document.title"}'
 curl -s localhost:8080/scrape -d '{"urls":"https://a.com,https://b.com","eval":"document.title"}'
@@ -527,7 +528,7 @@ Metodi supportati:
 * `notifications/*` → accettate senza risultato.
 
 ```bash
-chrome.exe --user-data-dir="E:/tmp/ab" --autobrowse=mcp --ab-port=8080 about:blank &
+chrome.exe --user-data-dir="E:/tmp/ab" --autobrowse=mcp --port=8080 about:blank &
 curl -s localhost:8080/mcp -d '{"jsonrpc":"2.0","id":1,"method":"initialize"}'
 curl -s localhost:8080/mcp -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
 curl -s localhost:8080/mcp -d '{"jsonrpc":"2.0","id":3,"method":"tools/call",
@@ -551,29 +552,30 @@ curl -s localhost:8080/mcp -d '{"jsonrpc":"2.0","id":3,"method":"tools/call",
 | `--autobrowse-max-results=N` | legacy: max risultati |
 | `--autobrowse-output=FILE` | legacy: file di output |
 
-### Input condivisi `--ab-*`
+### Input condivisi `--*`
 
 | Switch | Usato da | Descrizione |
 |---|---|---|
-| `--ab-url=URL` | fetch, monitor | pagina target |
-| `--ab-urls="u1,u2"` | scrape, warmup | lista URL (virgola/spazio) |
-| `--ab-query="Q"` | search, warmup | query (warmup: lista) |
-| `--ab-engine=<e>` | search, warmup | motore |
-| `--ab-max-results=N` | search | ceiling risultati |
-| `--ab-dump=<fmt>` | fetch, scrape | formato dump |
-| `--ab-scrape=<kind>` | search | scrape di ogni risultato (`text`\|`html`\|`links`) |
-| `--ab-eval="EXPR"` | fetch, scrape | espressione JS |
-| `--ab-selector=CSS` | monitor (e fetch) | selettore elemento |
-| `--ab-on-change="JS"` | monitor | JS che produce il valore |
-| `--ab-interval=SEC` | monitor | intervallo polling |
-| `--ab-max-runs=N` | monitor | stop dopo N poll |
-| `--ab-wait-until=<ev>` | fetch | `load`\|`domcontentloaded`\|`networkidle0` |
-| `--ab-wait=SEC` | fetch, scrape | settle extra |
-| `--ab-timeout=SEC` | fetch, scrape | timeout navigazione |
-| `--ab-top=N` | session-info | top domini |
-| `--ab-minutes=N` | warmup | durata |
-| `--ab-port=N` | serve/mcp | porta HTTP/WS |
-| `--ab-output=FILE` | vari | file di output |
+| `--url=URL` | fetch, monitor | pagina target |
+| `--urls="u1,u2"` | scrape, warmup | lista URL (virgola/spazio) |
+| `--query="Q"` | search, warmup | query (warmup: lista) |
+| `--engine=<e>` | search, warmup | motore |
+| `--max-results=N` | search | ceiling risultati |
+| `--dump=<fmt>` | fetch, scrape | formato dump |
+| `--concurrency=N` | scrape | tab in parallelo (default 4) |
+| `--scrape=<kind>` | search | scrape di ogni risultato (`text`\|`html`\|`links`) |
+| `--eval="EXPR"` | fetch, scrape | espressione JS |
+| `--selector=CSS` | monitor (e fetch) | selettore elemento |
+| `--on-change="JS"` | monitor | JS che produce il valore |
+| `--interval=SEC` | monitor | intervallo polling |
+| `--max-runs=N` | monitor | stop dopo N poll |
+| `--wait-until=<ev>` | fetch | `load`\|`domcontentloaded`\|`networkidle0` |
+| `--wait=SEC` | fetch, scrape | settle extra |
+| `--timeout=SEC` | fetch, scrape | timeout navigazione |
+| `--top=N` | session-info | top domini |
+| `--minutes=N` | warmup | durata |
+| `--port=N` | serve/mcp | porta HTTP/WS |
+| `--output=FILE` | vari | file di output |
 
 ### Flag globali nativi / env
 
@@ -595,7 +597,7 @@ curl -s localhost:8080/mcp -d '{"jsonrpc":"2.0","id":3,"method":"tools/call",
 
 | File | Ruolo |
 |---|---|
-| `autobrowse_switches.h` | nomi di tutti gli switch (`--autobrowse*`, `--ab-*`) |
+| `autobrowse_switches.h` | nomi di tutti gli switch (`--autobrowse*`, `--*`) |
 | `autobrowse_main_extra_parts.{h,cc}` | entrypoint: `ChromeBrowserMainExtraParts` che, in `PostBrowserStart()`, seleziona il sub-comando e istanzia il runner/server; in `PostEarlyInitialization()` silenzia i log di servizio |
 | `autobrowse_search_runner.{h,cc}` | runner di `search` (typing umano + estrazione + consent) |
 | `autobrowse_fetch_runner.{h,cc}` | runner di `fetch` |
@@ -640,73 +642,73 @@ pagina): per questo usa il canale DevTools `addScriptToEvaluateOnNewDocument`
 ## 11. Tutti i comandi possibili (cheat sheet)
 
 Assumi `chrome.exe = E:\project-seri\chromium\src\out\Default\chrome.exe`. In GUI
-ometti `--headless`. Output di default su **stdout**; aggiungi `--ab-output=FILE`
+ometti `--headless`. Output di default su **stdout**; aggiungi `--output=FILE`
 per scrivere su **file** (JSON per search/scrape, testo/HTML per fetch).
 
 ```bash
 # ── SEARCH ────────────────────────────────────────────────────────────────
 # solo link (SERP)
 chrome.exe --headless --user-data-dir="E:/tmp/ab" \
-  --autobrowse=search --ab-query="rust tokio" --ab-engine=google --ab-max-results=5
+  --autobrowse=search --query="rust tokio" --engine=google --max-results=5
 
 # link + scrape del testo di ogni risultato, su file JSON
 chrome.exe --headless --user-data-dir="E:/tmp/ab" \
-  --autobrowse=search --ab-query="rust tokio" --ab-engine=google --ab-max-results=5 \
-  --ab-scrape=text --ab-output="E:/tmp/out.json"
+  --autobrowse=search --query="rust tokio" --engine=google --max-results=5 \
+  --scrape=text --output="E:/tmp/out.json"
 
 # link + scrape dei link di ogni risultato (crawl 1 livello)
 chrome.exe --headless --user-data-dir="E:/tmp/ab" \
-  --autobrowse=search --ab-query="climate report" --ab-engine=bing --ab-scrape=links
+  --autobrowse=search --query="climate report" --engine=bing --scrape=links
 
 # scorciatoia legacy + GUI (finestra resta sui risultati)
 chrome.exe --user-data-dir="E:/tmp/ab" \
   --autobrowse-search="python asyncio" --autobrowse-engine=duckduckgo
 
 # ── FETCH ─────────────────────────────────────────────────────────────────
-chrome.exe --headless --autobrowse=fetch --ab-url="https://example.com" --ab-eval="document.title"
-chrome.exe --headless --autobrowse=fetch --ab-url="https://example.com" --ab-dump=text
-chrome.exe --headless --autobrowse=fetch --ab-url="https://example.com" --ab-dump=html
-chrome.exe --headless --autobrowse=fetch --ab-url="https://example.com" --ab-dump=links
-chrome.exe --headless --autobrowse=fetch --ab-url="https://example.com" --ab-dump=markdown
-chrome.exe --headless --autobrowse=fetch --ab-url="https://spa.example" \
-  --ab-wait-until=networkidle0 --ab-wait=3 --ab-timeout=60 --ab-output="E:/tmp/page.html"
+chrome.exe --headless --autobrowse=fetch --url="https://example.com" --eval="document.title"
+chrome.exe --headless --autobrowse=fetch --url="https://example.com" --dump=text
+chrome.exe --headless --autobrowse=fetch --url="https://example.com" --dump=html
+chrome.exe --headless --autobrowse=fetch --url="https://example.com" --dump=links
+chrome.exe --headless --autobrowse=fetch --url="https://example.com" --dump=markdown
+chrome.exe --headless --autobrowse=fetch --url="https://spa.example" \
+  --wait-until=networkidle0 --wait=3 --timeout=60 --output="E:/tmp/page.html"
 
-# ── SCRAPE (molti URL) ────────────────────────────────────────────────────
-chrome.exe --headless --autobrowse=scrape \
-  --ab-urls="https://example.com,https://example.org" --ab-eval="document.title"
-chrome.exe --headless --autobrowse=scrape \
-  --ab-urls="https://a.com,https://b.com" --ab-dump=text --ab-output="E:/tmp/scr.json"
+# ── SCRAPE (molti URL, in parallelo) ──────────────────────────────────────
+chrome.exe --headless --autobrowse=scrape --concurrency=4 \
+  --urls="https://example.com,https://example.org" --eval="document.title"
+chrome.exe --headless --autobrowse=scrape --concurrency=8 \
+  --urls="https://a.com,https://b.com" --dump=text --output="E:/tmp/scr.json"
 
 # ── MONITOR ───────────────────────────────────────────────────────────────
-chrome.exe --headless --autobrowse=monitor --ab-url="https://example.com" \
-  --ab-selector="h1" --ab-interval=30 --ab-max-runs=5
-chrome.exe --headless --autobrowse=monitor --ab-url="https://x.example/status" \
-  --ab-selector="#price" --ab-on-change="textContent.trim()" \
-  --ab-interval=60 --ab-output="E:/tmp/watch.ndjson"
+chrome.exe --headless --autobrowse=monitor --url="https://example.com" \
+  --selector="h1" --interval=30 --max-runs=5
+chrome.exe --headless --autobrowse=monitor --url="https://x.example/status" \
+  --selector="#price" --on-change="textContent.trim()" \
+  --interval=60 --output="E:/tmp/watch.ndjson"
 
 # ── SESSION-INFO ──────────────────────────────────────────────────────────
-chrome.exe --headless --user-data-dir="E:/tmp/ab" --autobrowse=session-info --ab-top=20
+chrome.exe --headless --user-data-dir="E:/tmp/ab" --autobrowse=session-info --top=20
 
 # ── WARMUP ────────────────────────────────────────────────────────────────
 chrome.exe --headless --user-data-dir="E:/tmp/ab" \
-  --autobrowse=warmup --ab-engine=google --ab-minutes=15
+  --autobrowse=warmup --engine=google --minutes=15
 chrome.exe --headless --user-data-dir="E:/tmp/ab" \
-  --autobrowse=warmup --ab-engine=bing --ab-minutes=10 \
-  --ab-query="rust jobs,python jobs" --ab-urls="https://news.ycombinator.com"
+  --autobrowse=warmup --engine=bing --minutes=10 \
+  --query="rust jobs,python jobs" --urls="https://news.ycombinator.com"
 
 # ── STEALTH (trasversale, su qualunque comando) ───────────────────────────
-chrome.exe --headless --stealth --autobrowse=fetch --ab-url="https://bot.sannysoft.com" --ab-dump=text
+chrome.exe --headless --stealth --autobrowse=fetch --url="https://bot.sannysoft.com" --dump=text
 chrome.exe --headless --stealth --user-data-dir="E:/tmp/ab" \
-  --autobrowse=search --ab-query="rust tokio" --ab-engine=google
+  --autobrowse=search --query="rust tokio" --engine=google
 
 # ── PROXY / USER-AGENT (flag nativi) ──────────────────────────────────────
 chrome.exe --headless --proxy-server="socks5://127.0.0.1:1080" \
-  --autobrowse=fetch --ab-url="https://example.com" --ab-dump=text
+  --autobrowse=fetch --url="https://example.com" --dump=text
 chrome.exe --headless --user-agent="MyUA/1.0" \
-  --autobrowse=fetch --ab-url="https://example.com" --ab-eval="navigator.userAgent"
+  --autobrowse=fetch --url="https://example.com" --eval="navigator.userAgent"
 
 # ── SERVER HTTP + WS + MCP ────────────────────────────────────────────────
-chrome.exe --user-data-dir="E:/tmp/ab" --autobrowse=serve --ab-port=8080 about:blank &
+chrome.exe --user-data-dir="E:/tmp/ab" --autobrowse=serve --port=8080 about:blank &
 curl -s localhost:8080/health
 curl -s localhost:8080/search      -d '{"query":"rust tokio","engine":"google","max_results":3}'
 curl -s localhost:8080/search      -d '{"query":"rust tokio","scrape":"text","max_results":2}'

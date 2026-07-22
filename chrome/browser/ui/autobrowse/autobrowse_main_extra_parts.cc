@@ -92,16 +92,16 @@ void AutobrowseMainExtraParts::PostBrowserStart() {
 void AutobrowseMainExtraParts::StartSearch() {
   const base::CommandLine& cmd = *base::CommandLine::ForCurrentProcess();
 
-  // Query: legacy --autobrowse-search=Q wins, else --ab-query.
+  // Query: legacy --autobrowse-search=Q wins, else --query.
   std::string query = cmd.GetSwitchValueASCII(switches::kAutobrowseSearch);
   if (query.empty()) {
-    query = cmd.GetSwitchValueASCII(switches::kAbQuery);
+    query = cmd.GetSwitchValueASCII(switches::kQuery);
   }
 
-  // Engine: --autobrowse-engine (legacy) or --ab-engine, default google.
+  // Engine: --autobrowse-engine (legacy) or --engine, default google.
   std::string engine = cmd.GetSwitchValueASCII(switches::kAutobrowseEngine);
   if (engine.empty()) {
-    engine = cmd.GetSwitchValueASCII(switches::kAbEngine);
+    engine = cmd.GetSwitchValueASCII(switches::kEngine);
   }
   if (engine.empty()) {
     engine = "google";
@@ -109,19 +109,19 @@ void AutobrowseMainExtraParts::StartSearch() {
 
   int max_results = GetIntSwitch(switches::kAutobrowseMaxResults, 0);
   if (max_results == 0) {
-    max_results = GetIntSwitch(switches::kAbMaxResults, 10);
+    max_results = GetIntSwitch(switches::kMaxResults, 10);
   }
 
   base::FilePath output_path =
       cmd.GetSwitchValuePath(switches::kAutobrowseOutput);
   if (output_path.empty()) {
-    output_path = cmd.GetSwitchValuePath(switches::kAbOutput);
+    output_path = cmd.GetSwitchValuePath(switches::kOutput);
   }
 
   search_runner_ = std::make_unique<AutobrowseSearchRunner>(
       std::move(engine), query, max_results, output_path);
-  if (cmd.HasSwitch(switches::kAbScrape)) {
-    search_runner_->SetScrape(cmd.GetSwitchValueASCII(switches::kAbScrape));
+  if (cmd.HasSwitch(switches::kScrape)) {
+    search_runner_->SetScrape(cmd.GetSwitchValueASCII(switches::kScrape));
   }
   search_runner_->Start();
 }
@@ -129,18 +129,18 @@ void AutobrowseMainExtraParts::StartSearch() {
 void AutobrowseMainExtraParts::StartFetch() {
   const base::CommandLine& cmd = *base::CommandLine::ForCurrentProcess();
 
-  const std::string url = cmd.GetSwitchValueASCII(switches::kAbUrl);
+  const std::string url = cmd.GetSwitchValueASCII(switches::kUrl);
   if (url.empty()) {
-    fprintf(stderr, "[autobrowse] fetch requires --ab-url=URL\n");
+    fprintf(stderr, "[autobrowse] fetch requires --url=URL\n");
     return;
   }
-  const std::string dump = cmd.GetSwitchValueASCII(switches::kAbDump);
-  const std::string eval = cmd.GetSwitchValueASCII(switches::kAbEval);
-  const std::string selector = cmd.GetSwitchValueASCII(switches::kAbSelector);
-  const std::string wait_until = cmd.GetSwitchValueASCII(switches::kAbWaitUntil);
-  const int extra_wait = GetIntSwitch(switches::kAbWait, 0);
-  const int timeout = GetIntSwitch(switches::kAbTimeout, 30);
-  const base::FilePath output_path = cmd.GetSwitchValuePath(switches::kAbOutput);
+  const std::string dump = cmd.GetSwitchValueASCII(switches::kDump);
+  const std::string eval = cmd.GetSwitchValueASCII(switches::kEval);
+  const std::string selector = cmd.GetSwitchValueASCII(switches::kSelector);
+  const std::string wait_until = cmd.GetSwitchValueASCII(switches::kWaitUntil);
+  const int extra_wait = GetIntSwitch(switches::kWait, 0);
+  const int timeout = GetIntSwitch(switches::kTimeout, 30);
+  const base::FilePath output_path = cmd.GetSwitchValuePath(switches::kOutput);
 
   fetch_runner_ = std::make_unique<AutobrowseFetchRunner>(
       url, dump, eval, selector, wait_until, extra_wait, timeout, output_path);
@@ -150,42 +150,44 @@ void AutobrowseMainExtraParts::StartFetch() {
 void AutobrowseMainExtraParts::StartScrape() {
   const base::CommandLine& cmd = *base::CommandLine::ForCurrentProcess();
 
-  const std::string urls_raw = cmd.GetSwitchValueASCII(switches::kAbUrls);
+  const std::string urls_raw = cmd.GetSwitchValueASCII(switches::kUrls);
   std::vector<std::string> urls = base::SplitString(
       urls_raw, ", ", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
   if (urls.empty()) {
     fprintf(stderr,
-            "[autobrowse] scrape requires --ab-urls=\"u1,u2,...\"\n");
+            "[autobrowse] scrape requires --urls=\"u1,u2,...\"\n");
     return;
   }
-  const std::string dump = cmd.GetSwitchValueASCII(switches::kAbDump);
-  const std::string eval = cmd.GetSwitchValueASCII(switches::kAbEval);
-  const int extra_wait = GetIntSwitch(switches::kAbWait, 0);
-  const int timeout = GetIntSwitch(switches::kAbTimeout, 30);
-  const base::FilePath output_path = cmd.GetSwitchValuePath(switches::kAbOutput);
+  const std::string dump = cmd.GetSwitchValueASCII(switches::kDump);
+  const std::string eval = cmd.GetSwitchValueASCII(switches::kEval);
+  const int extra_wait = GetIntSwitch(switches::kWait, 0);
+  const int timeout = GetIntSwitch(switches::kTimeout, 30);
+  const int concurrency = GetIntSwitch(switches::kConcurrency, 4);
+  const base::FilePath output_path = cmd.GetSwitchValuePath(switches::kOutput);
 
   scrape_runner_ = std::make_unique<AutobrowseScrapeRunner>(
-      std::move(urls), dump, eval, extra_wait, timeout, output_path);
+      std::move(urls), dump, eval, extra_wait, timeout, concurrency,
+      output_path);
   scrape_runner_->Start();
 }
 
 void AutobrowseMainExtraParts::StartMonitor() {
   const base::CommandLine& cmd = *base::CommandLine::ForCurrentProcess();
 
-  const std::string url = cmd.GetSwitchValueASCII(switches::kAbUrl);
+  const std::string url = cmd.GetSwitchValueASCII(switches::kUrl);
   if (url.empty()) {
-    fprintf(stderr, "[autobrowse] monitor requires --ab-url=URL\n");
+    fprintf(stderr, "[autobrowse] monitor requires --url=URL\n");
     return;
   }
-  const std::string selector = cmd.GetSwitchValueASCII(switches::kAbSelector);
-  const std::string on_change = cmd.GetSwitchValueASCII(switches::kAbOnChange);
-  const int interval = GetIntSwitch(switches::kAbInterval, 60);
+  const std::string selector = cmd.GetSwitchValueASCII(switches::kSelector);
+  const std::string on_change = cmd.GetSwitchValueASCII(switches::kOnChange);
+  const int interval = GetIntSwitch(switches::kInterval, 60);
   // max-runs: 0 = forever; allow explicit 0, so parse manually.
   int max_runs = 0;
-  if (cmd.HasSwitch(switches::kAbMaxRuns)) {
-    base::StringToInt(cmd.GetSwitchValueASCII(switches::kAbMaxRuns), &max_runs);
+  if (cmd.HasSwitch(switches::kMaxRuns)) {
+    base::StringToInt(cmd.GetSwitchValueASCII(switches::kMaxRuns), &max_runs);
   }
-  const base::FilePath output_path = cmd.GetSwitchValuePath(switches::kAbOutput);
+  const base::FilePath output_path = cmd.GetSwitchValuePath(switches::kOutput);
 
   monitor_runner_ = std::make_unique<AutobrowseMonitorRunner>(
       url, selector, on_change, interval, max_runs, output_path);
@@ -195,7 +197,7 @@ void AutobrowseMainExtraParts::StartMonitor() {
 void AutobrowseMainExtraParts::StartWarmup() {
   const base::CommandLine& cmd = *base::CommandLine::ForCurrentProcess();
 
-  std::string engine = cmd.GetSwitchValueASCII(switches::kAbEngine);
+  std::string engine = cmd.GetSwitchValueASCII(switches::kEngine);
   if (engine.empty()) {
     engine = cmd.GetSwitchValueASCII(switches::kAutobrowseEngine);
   }
@@ -204,9 +206,9 @@ void AutobrowseMainExtraParts::StartWarmup() {
   }
 
   double minutes = 15.0;
-  if (cmd.HasSwitch(switches::kAbMinutes)) {
+  if (cmd.HasSwitch(switches::kMinutes)) {
     double parsed = 0;
-    if (base::StringToDouble(cmd.GetSwitchValueASCII(switches::kAbMinutes),
+    if (base::StringToDouble(cmd.GetSwitchValueASCII(switches::kMinutes),
                              &parsed) &&
         parsed > 0) {
       minutes = parsed;
@@ -214,7 +216,7 @@ void AutobrowseMainExtraParts::StartWarmup() {
   }
 
   std::vector<std::string> queries = base::SplitString(
-      cmd.GetSwitchValueASCII(switches::kAbQuery), ",", base::TRIM_WHITESPACE,
+      cmd.GetSwitchValueASCII(switches::kQuery), ",", base::TRIM_WHITESPACE,
       base::SPLIT_WANT_NONEMPTY);
   if (queries.empty()) {
     queries = {"rust programming", "weather today", "latest news",
@@ -222,7 +224,7 @@ void AutobrowseMainExtraParts::StartWarmup() {
   }
 
   std::vector<std::string> urls = base::SplitString(
-      cmd.GetSwitchValueASCII(switches::kAbUrls), ", ", base::TRIM_WHITESPACE,
+      cmd.GetSwitchValueASCII(switches::kUrls), ", ", base::TRIM_WHITESPACE,
       base::SPLIT_WANT_NONEMPTY);
 
   warmup_runner_ = std::make_unique<AutobrowseWarmupRunner>(
@@ -231,7 +233,7 @@ void AutobrowseMainExtraParts::StartWarmup() {
 }
 
 void AutobrowseMainExtraParts::StartServe() {
-  const int port = GetIntSwitch(switches::kAbPort, 8080);
+  const int port = GetIntSwitch(switches::kPort, 8080);
   server_ = std::make_unique<AutobrowseServer>();
   if (!server_->Start(port)) {
     server_.reset();
@@ -240,7 +242,7 @@ void AutobrowseMainExtraParts::StartServe() {
 }
 
 void AutobrowseMainExtraParts::StartSessionInfo() {
-  const int top = GetIntSwitch(switches::kAbTop, 15);
+  const int top = GetIntSwitch(switches::kTop, 15);
   session_info_runner_ = std::make_unique<AutobrowseSessionInfoRunner>(top);
   session_info_runner_->Start();
 }

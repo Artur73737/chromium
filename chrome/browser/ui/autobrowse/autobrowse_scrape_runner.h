@@ -5,6 +5,8 @@
 #ifndef CHROME_BROWSER_UI_AUTOBROWSE_AUTOBROWSE_SCRAPE_RUNNER_H_
 #define CHROME_BROWSER_UI_AUTOBROWSE_AUTOBROWSE_SCRAPE_RUNNER_H_
 
+#include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -12,30 +14,33 @@
 #include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
-#include "base/timer/timer.h"
 #include "base/values.h"
-#include "content/public/browser/web_contents_observer.h"
+
+namespace content {
+class BrowserContext;
+}
 
 namespace autobrowse {
 
-// Scrapes many URLs in sequence inside the browser's active tab: for each URL it
-// navigates, lets the page render, evaluates --ab-eval (or dumps text/html/links
-// with --ab-dump), and collects one record per URL. Emits a JSON array to stdout
-// or a file. Mirrors the Obscura `scrape` command (many pages, one eval each).
-// A real navigation + DOM read per URL, never an API.
-class AutobrowseScrapeRunner : public content::WebContentsObserver {
+// Scrapes many URLs **in parallel** inside a single process: it opens up to
+// `concurrency` off-screen tabs at once, each navigating to a URL, letting the
+// page render, and evaluating --eval (or dumping text/html/links with --dump).
+// Results are collected in the original URL order and emitted as a JSON array to
+// stdout or a file. A real navigation + DOM read per URL, never an API.
+class AutobrowseScrapeRunner {
  public:
   AutobrowseScrapeRunner(std::vector<std::string> urls,
                          std::string dump,
                          std::string eval,
                          int extra_wait_seconds,
                          int timeout_seconds,
+                         int concurrency,
                          base::FilePath output_path);
 
   AutobrowseScrapeRunner(const AutobrowseScrapeRunner&) = delete;
   AutobrowseScrapeRunner& operator=(const AutobrowseScrapeRunner&) = delete;
 
-  ~AutobrowseScrapeRunner() override;
+  ~AutobrowseScrapeRunner();
 
   void Start();
 
@@ -45,40 +50,32 @@ class AutobrowseScrapeRunner : public content::WebContentsObserver {
   }
 
  private:
-  // content::WebContentsObserver:
-  void DocumentOnLoadCompletedInPrimaryMainFrame() override;
+  // One off-screen tab scraping one URL; defined in the .cc.
+  class Tab;
 
   std::string BuildExtractScript() const;
-
-  void TryAttach();
-  void NavigateCurrent();
-  void OnLoaded();
-  void RunExtract();
-  void OnExtractResult(base::Value value);
-  void AdvanceOrFinish();
+  content::BrowserContext* GetContext();
+  void LaunchMore();
+  void OnTabDone(size_t index, base::Value result);
+  void EraseTabAndContinue(size_t index);
   void Finish();
   void MaybeExit();
-  void OnItemTimeout();
-
-  base::OnceCallback<void(std::string)> on_complete_;
 
   const std::vector<std::string> urls_;
   const std::string dump_;
   const std::string eval_;
   const int extra_wait_seconds_;
   const int timeout_seconds_;
+  const int concurrency_;
   const base::FilePath output_path_;
+  base::OnceCallback<void(std::string)> on_complete_;
 
-  size_t index_ = 0;
-  bool attached_ = false;
-  bool extracted_current_ = false;
+  std::vector<base::Value> results_;  // one slot per URL, in order
+  size_t next_index_ = 0;             // next URL to launch
+  size_t completed_ = 0;
   bool finished_ = false;
-  base::ListValue results_;
-
   base::TimeTicks start_time_;
-  base::RepeatingTimer attach_timer_;
-  base::OneShotTimer item_deadline_timer_;
-  base::OneShotTimer settle_timer_;
+  std::map<size_t, std::unique_ptr<Tab>> tabs_;  // live tabs, keyed by URL index
 
   base::WeakPtrFactory<AutobrowseScrapeRunner> weak_factory_{this};
 };

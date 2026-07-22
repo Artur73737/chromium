@@ -208,7 +208,7 @@ bool AutobrowseServer::StartCommand() {
     }
     scrape_runner_ = std::make_unique<AutobrowseScrapeRunner>(
         std::move(urls), str("dump", ""), str("eval", ""), num("wait", 0),
-        num("timeout", 30), base::FilePath());
+        num("timeout", 30), num("concurrency", 4), base::FilePath());
     scrape_runner_->SetCompletionCallback(std::move(cb));
     scrape_runner_->Start();
     return true;

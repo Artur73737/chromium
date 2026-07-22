@@ -114,10 +114,21 @@ void AutobrowseMonitorRunner::LoadOnce() {
   content::NavigationController::LoadURLParams load_params{GURL(url_)};
   load_params.transition_type = ui::PAGE_TRANSITION_RELOAD;
   web_contents()->GetController().LoadURLWithParams(load_params);
+  // Watchdog: if the page never fires its load event (slow/broken/service
+  // crash), extract best-effort after this deadline so a poll can't hang.
+  poll_deadline_timer_.Start(FROM_HERE, base::Seconds(30),
+                             base::BindOnce(&AutobrowseMonitorRunner::OnPollTimeout,
+                                            weak_factory_.GetWeakPtr()));
 }
 
 void AutobrowseMonitorRunner::DocumentOnLoadCompletedInPrimaryMainFrame() {
   RunExtract();
+}
+
+void AutobrowseMonitorRunner::OnPollTimeout() {
+  if (!extracted_this_poll_) {
+    RunExtract();  // best effort read of whatever loaded
+  }
 }
 
 void AutobrowseMonitorRunner::RunExtract() {
@@ -129,6 +140,7 @@ void AutobrowseMonitorRunner::RunExtract() {
     return;
   }
   extracted_this_poll_ = true;
+  poll_deadline_timer_.Stop();
   rfh->ExecuteJavaScriptInIsolatedWorld(
       base::UTF8ToUTF16(BuildExtractScript()),
       base::BindOnce(&AutobrowseMonitorRunner::OnExtractResult,
@@ -210,6 +222,7 @@ void AutobrowseMonitorRunner::Stop() {
   stopped_ = true;
   attach_timer_.Stop();
   interval_timer_.Stop();
+  poll_deadline_timer_.Stop();
   Observe(nullptr);
   const bool headless =
       base::CommandLine::ForCurrentProcess()->HasSwitch("headless");
